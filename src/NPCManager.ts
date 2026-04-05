@@ -1,8 +1,11 @@
 import * as THREE from 'three';
 import { NPC } from './NPC';
+import { FatBikeNPC } from './FatBikeNPC';
 import { LevelConfig } from './LevelConfig';
 import { randomBetween, randomSign } from './utils';
 import { CYCLE_PATH_HALF_WIDTH, PATH_HALF_LENGTH } from './World';
+
+const FAT_BIKE_SPAWN_INTERVAL = 5.0; // seconds between each fat-bike spawn
 
 /**
  * Manages the lifecycle of all NPCs for a single level.
@@ -18,6 +21,10 @@ export class NPCManager {
   private npcs:          NPC[]  = [];
   private spawnTimer     = 0;
   private totalSpawned   = 0;
+
+  private fatBikes:          FatBikeNPC[] = [];
+  private fatBikeSpawnTimer  = 0;
+  private fatBikesSpawned    = 0;
 
   private readonly scene:  THREE.Scene;
   private readonly config: LevelConfig;
@@ -50,7 +57,7 @@ export class NPCManager {
    * @param delta - Elapsed time in seconds since the last frame.
    */
   update(delta: number): void {
-    // Spawn
+    // Spawn pedestrians
     if (this.totalSpawned < this.config.npcCount) {
       this.spawnTimer += delta;
       if (this.spawnTimer >= this.config.spawnInterval) {
@@ -59,9 +66,23 @@ export class NPCManager {
       }
     }
 
+    // Spawn fat bikes
+    if (this.fatBikesSpawned < this.config.fatBikeCount) {
+      this.fatBikeSpawnTimer += delta;
+      if (this.fatBikeSpawnTimer >= FAT_BIKE_SPAWN_INTERVAL) {
+        this.fatBikeSpawnTimer = 0;
+        this._spawnFatBike();
+      }
+    }
+
     // Tick each NPC
     for (const npc of this.npcs) {
       npc.update(delta);
+    }
+
+    // Tick each fat bike
+    for (const bike of this.fatBikes) {
+      bike.update(delta);
     }
 
     // Prune fully disposed NPCs
@@ -92,6 +113,14 @@ export class NPCManager {
   }
 
   /**
+   * Returns all active fat-bike NPCs.
+   * Used by `CollisionSystem` to check player-damaging collisions.
+   */
+  getLiveFatBikes(): readonly FatBikeNPC[] {
+    return this.fatBikes;
+  }
+
+  /**
    * Immediately remove and dispose all NPCs from the scene and reset all
    * counters. Called when a level restarts or a new level is loaded.
    */
@@ -100,6 +129,11 @@ export class NPCManager {
     this.npcs        = [];
     this.spawnTimer  = 0;
     this.totalSpawned = 0;
+
+    for (const bike of this.fatBikes) bike.dispose(this.scene);
+    this.fatBikes         = [];
+    this.fatBikeSpawnTimer = 0;
+    this.fatBikesSpawned   = 0;
   }
 
   // ─── Private ───────────────────────────────────────────────────────────────
@@ -116,5 +150,20 @@ export class NPCManager {
 
     this.npcs.push(new NPC(this.scene, speed, dir, x, z));
     this.totalSpawned++;
+  }
+
+  /**
+   * Instantiate one fat-bike NPC at a random lane position near a path end so
+   * it immediately rides toward the player area.
+   */
+  private _spawnFatBike(): void {
+    const x     = (Math.random() - 0.5) * (CYCLE_PATH_HALF_WIDTH * 2 - 0.8);
+    const dir   = randomSign();
+    // Spawn at the far end so it rides the full length toward the player
+    const z     = dir === 1 ? -PATH_HALF_LENGTH : PATH_HALF_LENGTH;
+    const speed = randomBetween(this.config.fatBikeSpeedMin, this.config.fatBikeSpeedMax);
+
+    this.fatBikes.push(new FatBikeNPC(this.scene, speed, dir, x, z));
+    this.fatBikesSpawned++;
   }
 }

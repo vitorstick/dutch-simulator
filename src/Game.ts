@@ -3,7 +3,7 @@ import { IsoCamera }               from './Camera';
 import { World }                   from './World';
 import { Player }                  from './Player';
 import { NPCManager }              from './NPCManager';
-import { checkCollisions }         from './CollisionSystem';
+import { checkCollisions, checkFatBikeCollisions } from './CollisionSystem';
 import { ScoreManager }            from './ScoreManager';
 import { UI }                      from './UI';
 import { LEVELS }                  from './LevelConfig';
@@ -180,13 +180,25 @@ export class Game {
     if (this.npcManager) {
       this.npcManager.update(delta);
 
-      // Collision
+      // Collision — pedestrians (player hits them, gains score)
       const hits = checkCollisions(this.player, this.npcManager);
       for (const npc of hits) {
         this.npcManager.hitNPC(npc);
         this.score.addHit(nowSec);
         this.camera.shake();
         playBell();
+      }
+
+      // Collision — fat bikes (they hit the player, player loses a life)
+      const fatBikeHits = checkFatBikeCollisions(this.player, this.npcManager);
+      for (const bike of fatBikeHits) {
+        bike.onHitPlayer();
+        this.score.loseLife();
+        this.camera.shake();
+        if (this.score.isGameOver) {
+          this._onGameOver();
+          return;
+        }
       }
 
       // Win condition

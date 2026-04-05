@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Player }     from './Player';
 import { NPC }        from './NPC';
+import { FatBikeNPC } from './FatBikeNPC';
 import { NPCManager } from './NPCManager';
 
 /**
@@ -33,6 +34,34 @@ export function checkCollisions(player: Player, manager: NPCManager): NPC[] {
     _npcBox.setFromObject(npc.mesh);
     if (_playerBox.intersectsBox(_npcBox)) {
       hits.push(npc);
+    }
+  }
+  return hits;
+}
+
+/**
+ * Performs per-frame AABB collision detection between the player and all
+ * fat-bike NPCs that are off hit-cooldown.
+ *
+ * Unlike pedestrian collisions, a fat-bike hit damages the **player** (loses
+ * one life). The fat bike itself is unaffected and keeps riding.
+ *
+ * @param player  - The player instance.
+ * @param manager - The NPC manager supplying fat-bike candidates.
+ * @returns Array of fat bikes that are currently colliding with the player and
+ *          are ready to deal damage. The caller must call `bike.onHitPlayer()`
+ *          on each result and deduct the life from `ScoreManager`.
+ */
+export function checkFatBikeCollisions(player: Player, manager: NPCManager): FatBikeNPC[] {
+  _playerBox.setFromObject(player.mesh);
+  _playerBox.expandByScalar(-0.12);
+
+  const hits: FatBikeNPC[] = [];
+  for (const bike of manager.getLiveFatBikes()) {
+    if (!bike.canHitPlayer) continue;
+    _npcBox.setFromObject(bike.mesh);
+    if (_playerBox.intersectsBox(_npcBox)) {
+      hits.push(bike);
     }
   }
   return hits;
