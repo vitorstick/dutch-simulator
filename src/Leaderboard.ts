@@ -3,8 +3,8 @@ export interface LeaderboardEntry {
   score: number;
 }
 
-const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL ?? '';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
 
 const HEADERS = {
   'apikey':        SUPABASE_ANON_KEY,
@@ -19,6 +19,7 @@ const HEADERS = {
  */
 export async function loadLeaderboard(): Promise<LeaderboardEntry[]> {
   try {
+    if (!SUPABASE_URL) return [];
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/scores?select=name,score&order=score.desc&limit=10`,
       { headers: HEADERS },
@@ -41,6 +42,7 @@ export async function loadLeaderboard(): Promise<LeaderboardEntry[]> {
 export async function saveScore(name: string, score: number): Promise<void> {
   const safeName = (name.trim() || 'ANON').slice(0, 20);
   try {
+    if (!SUPABASE_URL) return;
     await fetch(`${SUPABASE_URL}/rest/v1/scores`, {
       method:  'POST',
       headers: HEADERS,
