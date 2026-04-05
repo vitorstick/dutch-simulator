@@ -7,6 +7,7 @@ import { NPCManager }              from './NPCManager';
 import { checkCollisions, checkFatBikeCollisions } from './CollisionSystem';
 import { ScoreManager }            from './ScoreManager';
 import { UI }                      from './UI';
+import { loadLeaderboard, saveScore } from './Leaderboard';
 import { LEVELS }                  from './LevelConfig';
 
 // ─── Web Audio bell SFX ───────────────────────────────────────────────────────
@@ -91,6 +92,7 @@ export class Game {
   private levelIndex  = 0;
   private timeLeft    = 0;
   private lastTime    = 0;
+  private playerName  = 'ANON';
 
   /**
    * Initialise all subsystems, register global event listeners, start the
@@ -109,7 +111,19 @@ export class Game {
     window.addEventListener('resize', this._onResize.bind(this));
 
     this._loop(performance.now());
-    this.ui.showMenu(() => {
+    this._showMenu();
+  }
+
+  // ─── Menu ───────────────────────────────────────────────────────────
+
+  /**
+   * Show the main menu with the current leaderboard.
+   * The player enters their name and clicks START to begin.
+   */
+  private _showMenu(): void {
+    this.state = 'MENU';
+    this.ui.showMenu(loadLeaderboard(), (name) => {
+      this.playerName = name;
       this._hardReset();
       this._startLevel(0);
     });
@@ -269,10 +283,10 @@ export class Game {
 
     const nextIndex = this.levelIndex + 1;
     if (nextIndex >= LEVELS.length) {
+      saveScore(this.playerName, this.score.score);
       this.ui.showVictory(this.score.score, () => {
         this.score.fullReset();
-        this._hardReset();
-        this._startLevel(0);
+        this._showMenu();
       });
     } else {
       this.ui.showLevelComplete(this.levelIndex + 1, this.score.score, () => {
@@ -287,10 +301,10 @@ export class Game {
    */
   private _onGameOver(): void {
     this.state = 'GAME_OVER';
+    saveScore(this.playerName, this.score.score);
     this.ui.showGameOver(this.score.score, this.levelIndex + 1, () => {
       this.score.fullReset();
-      this._hardReset();
-      this._startLevel(0);
+      this._showMenu();
     });
   }
 

@@ -1,3 +1,5 @@
+import { type LeaderboardEntry } from './Leaderboard';
+
 /**
  * Manages all DOM-based UI elements overlaid on top of the Three.js canvas.
  *
@@ -78,16 +80,50 @@ export class UI {
   }
 
   /**
-   * Show the main menu overlay.
-   * @param onStart - Callback invoked when the player clicks "START RIDING".
+   * Show the main menu overlay with the top-scores leaderboard and a name
+   * entry field. The `onStart` callback receives the player's chosen name.
+   *
+   * @param entries  - Current leaderboard (top 10).
+   * @param onStart  - Callback invoked with the entered name when START is clicked.
    */
-  showMenu(onStart: () => void): void {
-    this._show(
-      '🚲 DUTCH DUCHE SIMULATOR',
-      'Ride your bike and clear the cycle path!<br>Use <b>WASD</b> or <b>Arrow Keys</b> to move.',
-      'START RIDING',
-      onStart,
-    );
+  showMenu(entries: LeaderboardEntry[], onStart: (name: string) => void): void {
+    this.titleEl.textContent = '🚲 DUTCH DUCHE SIMULATOR';
+
+    const medalFor = (i: number) => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+    const rows = entries.length === 0
+      ? `<tr><td colspan="3" class="lb-empty">No scores yet — be the first!</td></tr>`
+      : entries.slice(0, 10).map((e, i) =>
+          `<tr class="lb-row lb-rank-${i}"><td class="lb-rank">${medalFor(i)}</td><td class="lb-name">${this._esc(e.name)}</td><td class="lb-score">${e.score}</td></tr>`
+        ).join('');
+
+    this.bodyEl.innerHTML = `
+      <p class="menu-tagline">Ride your bike and clear the cycle path!<br>Use <b>WASD</b> or <b>Arrow Keys</b> to move.</p>
+      <div class="leaderboard">
+        <h3>🏆 TOP SCORES</h3>
+        <table>${rows}</table>
+      </div>
+      <div class="name-entry">
+        <label for="player-name">YOUR NAME</label>
+        <input id="player-name" type="text" maxlength="20" placeholder="ANON" autocomplete="off" spellcheck="false">
+      </div>
+    `;
+
+    this.btnEl.textContent = 'START RIDING';
+    this.btnEl.onclick = () => {
+      const input = document.getElementById('player-name') as HTMLInputElement | null;
+      const name  = (input?.value.trim() || 'ANON').slice(0, 20);
+      this.overlayEl.classList.add('hidden');
+      onStart(name);
+    };
+    this.overlayEl.classList.remove('hidden');
+
+    const nameInput = document.getElementById('player-name') as HTMLInputElement | null;
+    if (nameInput) {
+      nameInput.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Enter') this.btnEl.click();
+      });
+      setTimeout(() => nameInput.focus(), 60);
+    }
   }
 
   /**
@@ -140,6 +176,15 @@ export class UI {
   }
 
   // ─── Private ───────────────────────────────────────────────────────────────
+
+  /** Escape HTML special characters to prevent XSS in leaderboard names. */
+  private _esc(str: string): string {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
 
   /**
    * Populate and reveal the shared overlay panel.

@@ -101,10 +101,12 @@ body {
   background: rgba(0, 0, 0, 0.88);
   border: 3px solid #ff6600;
   border-radius: 14px;
-  padding: 44px 64px;
+  padding: 44px 56px;
   text-align: center;
   pointer-events: all;
-  min-width: 360px;
+  min-width: 380px;
+  max-width: 520px;
+  width: 90vw;
 }
 
 #overlay.hidden {
@@ -140,4 +142,95 @@ body {
 
 #overlay-btn:hover {
   background: #ff8800;
+}
+
+/* ── Menu: leaderboard ───────────────────────────────────────────────────── */
+
+.menu-tagline {
+  font-size: 15px;
+  color: #ccc;
+  line-height: 1.6;
+  margin-bottom: 18px;
+}
+
+.leaderboard {
+  margin: 0 0 18px;
+  text-align: center;
+}
+
+.leaderboard h3 {
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #ff6600;
+  margin-bottom: 8px;
+}
+
+.leaderboard table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.leaderboard td {
+  padding: 5px 8px;
+  border-bottom: 1px solid rgba(255, 102, 0, 0.15);
+  color: #ddd;
+}
+
+.lb-rank-0 td { color: #ffd700; font-weight: bold; }
+.lb-rank-1 td { color: #c0c0c0; }
+.lb-rank-2 td { color: #cd7f32; }
+
+.lb-rank  { width: 28px; text-align: center; }
+.lb-name  { text-align: left;  text-transform: uppercase; letter-spacing: 1px; }
+.lb-score { text-align: right; font-weight: bold; }
+
+.lb-empty {
+  color: #666;
+  font-style: italic;
+  padding: 10px 0;
+}
+
+/* ── Menu: name entry ────────────────────────────────────────────────────── */
+
+.name-entry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.name-entry label {
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: #aaa;
+  white-space: nowrap;
+}
+
+#player-name {
+  background: rgba(255, 255, 255, 0.08);
+  border: 2px solid #ff6600;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: bold;
+  padding: 6px 12px;
+  outline: none;
+  width: 150px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  caret-color: #ff6600;
+}
+
+#player-name::placeholder {
+  color: #555;
+  font-weight: normal;
+  letter-spacing: 1px;
+}
+
+#player-name:focus {
+  border-color: #ff8800;
+  background: rgba(255, 102, 0, 0.12);
 }
