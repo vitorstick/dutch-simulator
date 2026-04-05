@@ -245,11 +245,14 @@ export class Player {
     head.castShadow = true;
     this.mesh.add(head);
 
-    const helmGeo = new THREE.SphereGeometry(0.22, 8, 5);
-    const helm    = new THREE.Mesh(helmGeo, orangeMat);
-    helm.position.set(0, ST.y + 1.10, ST.z - 0.04);
-    helm.scale.y = 0.75;
-    this.mesh.add(helm);
+    // Hair: replace helmet with a simple blond hair mesh (helmetless Dutch cyclist)
+    const hairMat = new THREE.MeshLambertMaterial({ color: 0xffe082 });
+    const hairGeo = new THREE.SphereGeometry(0.22, 8, 5);
+    const hair    = new THREE.Mesh(hairGeo, hairMat);
+    hair.position.set(0, ST.y + 1.08, ST.z - 0.04);
+    hair.scale.set(1, 0.82, 1);
+    hair.castShadow = true;
+    this.mesh.add(hair);
 
     for (const side of [-1, 1]) {
       const armFrom = new THREE.Vector3(side * 0.19, ST.y + 0.55, ST.z - 0.02);
