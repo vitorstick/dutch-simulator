@@ -1,30 +1,28 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
 import { clamp } from './utils';
-import { CYCLE_PATH_HALF_WIDTH, PATH_HALF_LENGTH } from './World';
+import { PathSystem, CYCLE_PATH_HALF_WIDTH } from './PathSystem';
 
-const MAX_SPEED    = 12;
-const ACCELERATION = 22;
-const FRICTION     = 18;
+const MAX_SPEED_FWD = 12;
+const MAX_SPEED_LAT = 6;
+const ACCELERATION  = 22;
+const FRICTION      = 18;
 
-/**
- * Represents the player-controlled cyclist.
- *
- * Responsibilities:
- * - Builds the bicycle + rider 3D mesh procedurally.
- * - Reads keyboard input (WASD / arrow keys) each frame.
- * - Applies momentum-based movement physics (acceleration + friction).
- * - Constrains the cyclist to the cycle path bounds.
- * - Rotates the mesh to always face the direction of travel.
- */
 export class Player {
   readonly mesh: THREE.Group;
-  private readonly velocity = new THREE.Vector3();
-  private readonly keys     = new Set<string>();
+
+  private pathDist:  number = 5;
+  private lateral:   number = 0;
+  private velFwd:    number = 0;
+  private velLat:    number = 0;
+
+  private readonly pathSystem: PathSystem;
+  private readonly keys = new Set<string>();
 
   private readonly _onKeyDown: (e: KeyboardEvent) => void;
   private readonly _onKeyUp:   (e: KeyboardEvent) => void;
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Scene, pathSystem: PathSystem) {
+    this.pathSystem = pathSystem;
     this.mesh = new THREE.Group();
     this._buildMesh();
     scene.add(this.mesh);
@@ -33,120 +31,76 @@ export class Player {
     this._onKeyUp   = (e: KeyboardEvent) => this.keys.delete(e.code);
     window.addEventListener('keydown', this._onKeyDown);
     window.addEventListener('keyup',   this._onKeyUp);
+
+    this._syncWorldPos();
   }
 
-  /** Current world-space position of the cyclist (centre of the mesh group). */
   get position(): THREE.Vector3 { return this.mesh.position; }
+  get pathDistance(): number     { return this.pathDist; }
 
-  /**
-   * Advance the player by one frame.
-   *
-   * @param delta - Elapsed time in seconds since the last frame.
-   *
-   * Each call:
-   * 1. Samples active keys and builds a normalised input vector.
-   * 2. Applies acceleration in the input direction, or friction when coasting.
-   * 3. Clamps velocity to `MAX_SPEED`.
-   * 4. Moves the mesh and clamps it inside the cycle-path boundaries.
-   * 5. Rotates the mesh to face the current velocity direction.
-   */
   update(delta: number): void {
-    // ── Input ──────────────────────────────────────────────────────────────
-    const input = new THREE.Vector3();
-    if (this.keys.has('KeyW') || this.keys.has('ArrowUp'))    input.z -= 1;
-    if (this.keys.has('KeyS') || this.keys.has('ArrowDown'))  input.z += 1;
-    if (this.keys.has('KeyA') || this.keys.has('ArrowLeft'))  input.x -= 1;
-    if (this.keys.has('KeyD') || this.keys.has('ArrowRight')) input.x += 1;
+    const fwd = (this.keys.has('KeyW') || this.keys.has('ArrowUp'))    ? 1
+              : (this.keys.has('KeyS') || this.keys.has('ArrowDown'))  ? -1 : 0;
+    const lat = (this.keys.has('KeyD') || this.keys.has('ArrowRight')) ? 1
+              : (this.keys.has('KeyA') || this.keys.has('ArrowLeft'))  ? -1 : 0;
 
-    if (input.lengthSq() > 0) {
-      input.normalize();
-      this.velocity.x += input.x * ACCELERATION * delta;
-      this.velocity.z += input.z * ACCELERATION * delta;
+    if (fwd !== 0) {
+      this.velFwd += fwd * ACCELERATION * delta;
     } else {
-      const speed = this.velocity.length();
-      if (speed > 0) {
-        const decel = Math.min(FRICTION * delta, speed);
-        this.velocity.multiplyScalar(1 - decel / speed);
+      const spd = Math.abs(this.velFwd);
+      if (spd > 0) {
+        const dec = Math.min(FRICTION * delta, spd);
+        this.velFwd *= 1 - dec / spd;
+      }
+    }
+    if (lat !== 0) {
+      this.velLat += lat * ACCELERATION * delta;
+    } else {
+      const spd = Math.abs(this.velLat);
+      if (spd > 0) {
+        const dec = Math.min(FRICTION * delta, spd);
+        this.velLat *= 1 - dec / spd;
       }
     }
 
-    // ── Clamp speed ────────────────────────────────────────────────────────
-    const speed = this.velocity.length();
-    if (speed > MAX_SPEED) this.velocity.multiplyScalar(MAX_SPEED / speed);
+    if (Math.abs(this.velFwd) > MAX_SPEED_FWD) this.velFwd = Math.sign(this.velFwd) * MAX_SPEED_FWD;
+    if (Math.abs(this.velLat) > MAX_SPEED_LAT) this.velLat = Math.sign(this.velLat) * MAX_SPEED_LAT;
 
-    // ── Move ───────────────────────────────────────────────────────────────
-    this.mesh.position.x += this.velocity.x * delta;
-    this.mesh.position.z += this.velocity.z * delta;
+    this.pathDist += this.velFwd * delta;
+    this.lateral  += this.velLat * delta;
 
-    // ── Constrain to cycle path ────────────────────────────────────────────
-    this.mesh.position.x = clamp(
-      this.mesh.position.x,
-      -CYCLE_PATH_HALF_WIDTH + 0.5,
-       CYCLE_PATH_HALF_WIDTH - 0.5,
-    );
-    this.mesh.position.z = clamp(
-      this.mesh.position.z,
-      -PATH_HALF_LENGTH + 1,
-       PATH_HALF_LENGTH  - 1,
-    );
+    if (this.pathDist < 0) { this.pathDist = 0; this.velFwd = 0; }
+    this.lateral = clamp(this.lateral, -(CYCLE_PATH_HALF_WIDTH - 0.5), CYCLE_PATH_HALF_WIDTH - 0.5);
 
-    // ── Face movement direction ────────────────────────────────────────────
-    if (this.velocity.lengthSq() > 0.5) {
-      this.mesh.rotation.y = Math.atan2(this.velocity.x, this.velocity.z);
+    this._syncWorldPos();
+
+    const { dirX, dirZ } = this.pathSystem.dirAt(this.pathDist);
+    if (Math.abs(this.velFwd) > 0.5 || Math.abs(this.velLat) > 0.5) {
+      const sign = this.velFwd >= 0 ? 1 : -1;
+      this.mesh.rotation.y = Math.atan2(dirX * sign, -dirZ * sign);
     }
   }
 
-  /**
-   * Teleport the cyclist back to the spawn origin and clear all motion.
-   * Called at the start of each level.
-   */
   reset(): void {
-    this.mesh.position.set(0, 0, 0);
-    this.velocity.set(0, 0, 0);
+    this.pathDist = 5;
+    this.lateral  = 0;
+    this.velFwd   = 0;
+    this.velLat   = 0;
     this.keys.clear();
+    this._syncWorldPos();
   }
 
-  /**
-   * Clean up global event listeners.
-   * Must be called if the Player instance is ever destroyed to avoid memory leaks.
-   */
   dispose(): void {
     window.removeEventListener('keydown', this._onKeyDown);
     window.removeEventListener('keyup',   this._onKeyUp);
   }
 
-  // ─── Mesh construction ─────────────────────────────────────────────────────
+  private _syncWorldPos(): void {
+    const pos = this.pathSystem.getWorldPos(this.pathDist, this.lateral);
+    this.mesh.position.x = pos.x;
+    this.mesh.position.z = pos.y;   // Vector2.y == world Z
+  }
 
-  /**
-   * Procedurally build the full bicycle + rider mesh and attach it to `this.mesh`.
-   *
-   * Structure overview:
-   * ┌─ Wheels (front & rear)
-   * │    TorusGeometry tyre  (black)
-   * │    TorusGeometry rim   (chrome, smaller radius)
-   * │    CylinderGeometry hub (chrome, axle width)
-   * │    rotation.z = PI/2 so the torus ring stands upright in the YZ plane,
-   * │    meaning the wheel rolls along the Z axis (forward direction).
-   * │
-   * ├─ Diamond frame  (6 CylinderGeometry tubes via _tube())
-   * │    seat tube  · down tube  · top tube
-   * │    chain stay · seat stay  · fork (chrome)
-   * │
-   * ├─ Handlebar
-   * │    stem (chrome) + wide flat Dutch city-bike bar
-   * │
-   * ├─ Saddle + seat post
-   * │
-   * ├─ Rear rack  (Amsterdam omafiets style: rail + platform)
-   * │
-   * └─ Rider
-   *      hips · torso (orange jersey) · head (skin) · helmet (orange)
-   *      arms (tubes from shoulders to handlebar grips)
-   *
-   * All positions are expressed in the mesh's local space.
-   * The bike faces the −Z direction by default; rotation is applied by
-   * `update()` via `this.mesh.rotation.y`.
-   */
   private _buildMesh(): void {
     const orangeMat = new THREE.MeshLambertMaterial({ color: 0xff6600 });
     const chromeMat = new THREE.MeshLambertMaterial({ color: 0xbbbbbb });
@@ -156,20 +110,15 @@ export class Player {
     const rackMat   = new THREE.MeshLambertMaterial({ color: 0x888888 });
     const armMat    = new THREE.MeshLambertMaterial({ color: 0xff7722 });
 
-    const WR = 0.34; // wheel radius = hub axle height
+    const WR = 0.34;
 
-    // ── Key frame joints (bike faces -Z direction) ──────────────────────────
-    const RA = new THREE.Vector3(0, WR,   0.50);  // rear axle
-    const FA = new THREE.Vector3(0, WR,  -0.50);  // front axle
-    const BB = new THREE.Vector3(0, 0.32, 0.08);  // bottom bracket (pedal spindle)
-    const ST = new THREE.Vector3(0, 0.90, 0.18);  // seat tube top / saddle rail
-    const HT = new THREE.Vector3(0, 0.74, -0.42); // head tube top (stem)
-    const HB = new THREE.Vector3(0, 0.48, -0.36); // head tube bottom / fork crown
+    const RA = new THREE.Vector3(0, WR,   0.50);
+    const FA = new THREE.Vector3(0, WR,  -0.50);
+    const BB = new THREE.Vector3(0, 0.32, 0.08);
+    const ST = new THREE.Vector3(0, 0.90, 0.18);
+    const HT = new THREE.Vector3(0, 0.74, -0.42);
+    const HB = new THREE.Vector3(0, 0.48, -0.36);
 
-    // ── Wheels ──────────────────────────────────────────────────────────────
-    // TorusGeometry default: ring in XY plane, hole axis along Z.
-    // rotation.y = PI/2 maps hole axis Z→X and puts ring in YZ plane,
-    // so the wheel stands upright and rolls forward along Z.
     const tireGeo = new THREE.TorusGeometry(WR,        0.075, 6, 18);
     const rimGeo  = new THREE.TorusGeometry(WR * 0.72, 0.025, 6, 18);
     const hubGeo  = new THREE.CylinderGeometry(0.06, 0.06, 0.15, 8);
@@ -178,9 +127,9 @@ export class Player {
       const tire = new THREE.Mesh(tireGeo, blackMat);
       const rim  = new THREE.Mesh(rimGeo,  chromeMat);
       const hub  = new THREE.Mesh(hubGeo,  chromeMat);
-      tire.rotation.y = Math.PI / 2; // hole axis Z→X, ring into YZ plane, rolls along Z
+      tire.rotation.y = Math.PI / 2;
       rim.rotation.y  = Math.PI / 2;
-      hub.rotation.z  = Math.PI / 2; // cylinder default axis Y→X
+      hub.rotation.z  = Math.PI / 2;
       tire.position.copy(axlePos);
       rim.position.copy(axlePos);
       hub.position.copy(axlePos);
@@ -188,105 +137,85 @@ export class Player {
       this.mesh.add(tire, rim, hub);
     }
 
-    // ── Diamond frame ───────────────────────────────────────────────────────
-    this._tube(BB, ST,  0.050, orangeMat); // seat tube
-    this._tube(BB, HB,  0.052, orangeMat); // down tube
-    this._tube(ST, HT,  0.042, orangeMat); // top tube
-    this._tube(BB, RA,  0.036, orangeMat); // chain stay
-    this._tube(ST, RA,  0.034, orangeMat); // seat stay
-    this._tube(HB, FA,  0.040, chromeMat); // fork
+    this._tube(BB, ST,  0.050, orangeMat);
+    this._tube(BB, HB,  0.052, orangeMat);
+    this._tube(ST, HT,  0.042, orangeMat);
+    this._tube(BB, RA,  0.036, orangeMat);
+    this._tube(ST, RA,  0.034, orangeMat);
+    this._tube(HB, FA,  0.040, chromeMat);
 
-    // ── Handlebar ───────────────────────────────────────────────────────────
     const hbarTop = new THREE.Vector3(0, 0.93, -0.43);
-    this._tube(HT, hbarTop, 0.022, chromeMat); // stem
-    this._tube(                                // Dutch upright bar
-      new THREE.Vector3(-0.30, 0.93, -0.43),
-      new THREE.Vector3( 0.30, 0.93, -0.43),
-      0.022, chromeMat,
-    );
+    this._tube(HT, hbarTop, 0.032, chromeMat);
+    const barGeo = new THREE.BoxGeometry(0.60, 0.06, 0.06);
+    const bar    = new THREE.Mesh(barGeo, chromeMat);
+    bar.position.copy(hbarTop);
+    this.mesh.add(bar);
 
-    // ── Saddle & seat post ───────────────────────────────────────────────────
-    const saddleGeo = new THREE.BoxGeometry(0.12, 0.04, 0.36);
+    const saddleGeo = new THREE.BoxGeometry(0.28, 0.06, 0.55);
     const saddle    = new THREE.Mesh(saddleGeo, saddleMat);
-    saddle.position.set(ST.x, ST.y + 0.04, ST.z);
+    saddle.position.set(0, ST.y + 0.08, ST.z);
     this.mesh.add(saddle);
-    this._tube(ST, new THREE.Vector3(ST.x, ST.y + 0.1, ST.z), 0.022, chromeMat);
 
-    // ── Rear rack (Amsterdam omafiets style) ─────────────────────────────────
-    this._tube(ST, new THREE.Vector3(0, ST.y, RA.z), 0.018, rackMat);
-    const rackGeo  = new THREE.BoxGeometry(0.30, 0.025, 0.28);
-    const rackPlat = new THREE.Mesh(rackGeo, rackMat);
-    rackPlat.position.set(0, ST.y + 0.02, (ST.z + RA.z) * 0.5);
-    this.mesh.add(rackPlat);
+    const postGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.25, 6);
+    const seatPost = new THREE.Mesh(postGeo, chromeMat);
+    seatPost.position.set(0, ST.y - 0.05, ST.z);
+    this.mesh.add(seatPost);
 
-    // ── Rider ────────────────────────────────────────────────────────────────
-    // Hips (on saddle)
-    const hipsGeo = new THREE.BoxGeometry(0.26, 0.18, 0.20);
-    const hips    = new THREE.Mesh(hipsGeo, orangeMat);
-    hips.position.set(0, ST.y + 0.16, ST.z - 0.02);
+    const rackGeo = new THREE.BoxGeometry(0.36, 0.04, 0.45);
+    const rack    = new THREE.Mesh(rackGeo, rackMat);
+    rack.position.set(0, RA.y + 0.52, RA.z);
+    this.mesh.add(rack);
+
+    const hipGeo = new THREE.BoxGeometry(0.34, 0.30, 0.28);
+    const hips   = new THREE.Mesh(hipGeo, orangeMat);
+    hips.position.set(0, ST.y + 0.23, ST.z + 0.06);
     hips.castShadow = true;
     this.mesh.add(hips);
 
-    // Torso (slight forward lean — city bike upright posture)
-    const torsoGeo = new THREE.BoxGeometry(0.28, 0.52, 0.22);
+    const torsoGeo = new THREE.BoxGeometry(0.38, 0.46, 0.32);
     const torso    = new THREE.Mesh(torsoGeo, orangeMat);
-    torso.position.set(0, ST.y + 0.54, ST.z - 0.06);
-    torso.rotation.x  = 0.20;
-    torso.castShadow  = true;
+    torso.position.set(0, ST.y + 0.62, ST.z + 0.02);
+    torso.castShadow = true;
     this.mesh.add(torso);
 
-    // Head
-    const headGeo = new THREE.SphereGeometry(0.17, 8, 7);
+    const headGeo = new THREE.SphereGeometry(0.20, 8, 6);
     const head    = new THREE.Mesh(headGeo, skinMat);
-    head.position.set(0, ST.y + 1.01, ST.z - 0.18);
+    head.position.set(0, ST.y + 1.05, ST.z - 0.04);
     head.castShadow = true;
     this.mesh.add(head);
 
-    // Helmet (half-sphere cap)
-    const helmetGeo = new THREE.SphereGeometry(0.20, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2);
-    const helmet    = new THREE.Mesh(helmetGeo, orangeMat);
-    helmet.position.set(0, ST.y + 1.10, ST.z - 0.18);
-    this.mesh.add(helmet);
+    const helmGeo = new THREE.SphereGeometry(0.22, 8, 5);
+    const helm    = new THREE.Mesh(helmGeo, orangeMat);
+    helm.position.set(0, ST.y + 1.10, ST.z - 0.04);
+    helm.scale.y = 0.75;
+    this.mesh.add(helm);
 
-    // Arms from shoulders to handlebar grips
-    const shoulderL = new THREE.Vector3( 0.15, ST.y + 0.74, ST.z - 0.08);
-    const shoulderR = new THREE.Vector3(-0.15, ST.y + 0.74, ST.z - 0.08);
-    this._tube(shoulderL, new THREE.Vector3( 0.26, 0.93, -0.43), 0.044, armMat);
-    this._tube(shoulderR, new THREE.Vector3(-0.26, 0.93, -0.43), 0.044, armMat);
+    for (const side of [-1, 1]) {
+      const armFrom = new THREE.Vector3(side * 0.19, ST.y + 0.55, ST.z - 0.02);
+      const armTo   = new THREE.Vector3(side * 0.28, hbarTop.y,   hbarTop.z);
+      this._tube(armFrom, armTo, 0.055, armMat);
+    }
+
+    void saddleMat; void rackMat; void skinMat;
   }
 
-  /**
-   * Add a cylindrical tube between two world-space points to `this.mesh`.
-   *
-   * Used throughout `_buildMesh` to construct every strut of the bicycle frame,
-   * the fork, handlebar stem, seat post, rack rail, and rider arms.
-   *
-   * @param from   - Start point of the tube (local space).
-   * @param to     - End point of the tube (local space).
-   * @param radius - Radius of the cylinder in world units.
-   * @param mat    - Lambert material to apply to the mesh.
-   *
-   * Implementation note: Three.js `CylinderGeometry` is aligned along +Y by
-   * default, so `quaternion.setFromUnitVectors(UP, dir)` is used to rotate it
-   * to the correct orientation without any Euler angle gimbal issues.
-   */
   private _tube(
-    from:   THREE.Vector3,
-    to:     THREE.Vector3,
+    a: THREE.Vector3,
+    b: THREE.Vector3,
     radius: number,
-    mat:    THREE.MeshLambertMaterial,
+    mat: THREE.Material,
   ): void {
-    const dir    = new THREE.Vector3().subVectors(to, from);
+    const dir    = new THREE.Vector3().subVectors(b, a);
     const length = dir.length();
-    if (length < 0.001) return;
-    const mid  = new THREE.Vector3().lerpVectors(from, to, 0.5);
-    const geo  = new THREE.CylinderGeometry(radius, radius, length, 6);
-    const mesh = new THREE.Mesh(geo, mat);
+    const geo    = new THREE.CylinderGeometry(radius, radius, length, 6);
+    const mesh   = new THREE.Mesh(geo, mat);
+
+    const mid = new THREE.Vector3().addVectors(a, b).multiplyScalar(0.5);
     mesh.position.copy(mid);
-    mesh.quaternion.setFromUnitVectors(
-      new THREE.Vector3(0, 1, 0),
-      dir.normalize(),
-    );
+
+    const up = new THREE.Vector3(0, 1, 0);
+    mesh.quaternion.setFromUnitVectors(up, dir.normalize());
+
     mesh.castShadow = true;
     this.mesh.add(mesh);
   }

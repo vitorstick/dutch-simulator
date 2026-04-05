@@ -2,6 +2,7 @@ import { createScene, SceneSetup } from './Scene';
 import { IsoCamera }               from './Camera';
 import { World }                   from './World';
 import { Player }                  from './Player';
+import { PathSystem }              from './PathSystem';
 import { NPCManager }              from './NPCManager';
 import { checkCollisions, checkFatBikeCollisions } from './CollisionSystem';
 import { ScoreManager }            from './ScoreManager';
@@ -77,15 +78,13 @@ type GameState = 'MENU' | 'PLAYING' | 'LEVEL_COMPLETE' | 'GAME_OVER';
  * - `UI`           — DOM HUD + overlay screens
  */
 export class Game {
-  private readonly setup:    SceneSetup;
-  private readonly camera:   IsoCamera;
-  private readonly player:   Player;
-  private readonly score:    ScoreManager;
-  private readonly ui:       UI;
-
-  // World is recreated once; kept to ensure it isn't GC'd
-  // @ts-expect-error intentional reference holder
-  private readonly _world: World;
+  private readonly setup:      SceneSetup;
+  private readonly camera:     IsoCamera;
+  private readonly player:     Player;
+  private readonly score:      ScoreManager;
+  private readonly ui:         UI;
+  private readonly pathSystem: PathSystem;
+  private readonly world:      World;
 
   private npcManager: NPCManager | null = null;
   private state:      GameState = 'MENU';
@@ -98,12 +97,14 @@ export class Game {
    * render loop, and show the main menu overlay.
    */
   constructor() {
-    this.setup  = createScene();
-    this.camera = new IsoCamera();
-    this._world = new World(this.setup.scene);
-    this.player = new Player(this.setup.scene);
-    this.score  = new ScoreManager();
-    this.ui     = new UI();
+    this.setup      = createScene();
+    this.camera     = new IsoCamera();
+    this.pathSystem = new PathSystem();
+    this.world      = new World(this.setup.scene);
+    this.player     = new Player(this.setup.scene, this.pathSystem);
+    this.score      = new ScoreManager();
+    this.ui         = new UI();
+    this.world.update(this.pathSystem);
 
     window.addEventListener('resize', this._onResize.bind(this));
 
@@ -127,10 +128,17 @@ export class Game {
     this.timeLeft   = cfg.timeLimit;
 
     this.score.resetLevel();
+
+    // Reset path and world geometry so the player always restarts at pathDist=5
+    // on a valid segment (pruned segments from a previous run are wiped).
+    this.pathSystem.reset();
+    this.world.reset();
+    this.world.update(this.pathSystem);
+
     this.player.reset();
 
     if (this.npcManager) this.npcManager.clear();
-    this.npcManager = new NPCManager(this.setup.scene, cfg);
+    this.npcManager = new NPCManager(this.setup.scene, cfg, this.pathSystem);
 
     this.state = 'PLAYING';
   }
@@ -173,12 +181,18 @@ export class Game {
   private _update(delta: number, nowSec: number): void {
     if (this.state !== 'PLAYING') return;
 
+    // ── Path system ──────────────────────────────────────────────────────────
+    const playerDist = this.player.pathDistance;
+    this.pathSystem.ensureAhead(playerDist);
+    this.pathSystem.pruneBehind(playerDist);
+    this.world.update(this.pathSystem);
+
     // ── Player ──────────────────────────────────────────────────────────────
     this.player.update(delta);
 
     // ── NPCs ────────────────────────────────────────────────────────────────
     if (this.npcManager) {
-      this.npcManager.update(delta);
+      this.npcManager.update(delta, playerDist);
 
       // Collision — pedestrians (player hits them, gains score)
       const hits = checkCollisions(this.player, this.npcManager);
@@ -223,7 +237,8 @@ export class Game {
     }
 
     // ── Camera & HUD ────────────────────────────────────────────────────────
-    this.camera.update(delta, this.player.position);
+    const pathDir = this.pathSystem.dirAt(this.player.pathDistance);
+    this.camera.update(delta, this.player.position, pathDir);
     this.ui.update(
       this.score.score,
       this.score.lives,
