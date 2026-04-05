@@ -167,8 +167,9 @@ export class Player {
     const HB = new THREE.Vector3(0, 0.48, -0.36); // head tube bottom / fork crown
 
     // ── Wheels ──────────────────────────────────────────────────────────────
-    // TorusGeometry default ring is in XY plane (hole along Z).
-    // rotation.y = PI/2 → hole faces along X = wheel axle direction.
+    // TorusGeometry default: ring in XY plane, hole axis along Z.
+    // rotation.y = PI/2 maps hole axis Z→X and puts ring in YZ plane,
+    // so the wheel stands upright and rolls forward along Z.
     const tireGeo = new THREE.TorusGeometry(WR,        0.075, 6, 18);
     const rimGeo  = new THREE.TorusGeometry(WR * 0.72, 0.025, 6, 18);
     const hubGeo  = new THREE.CylinderGeometry(0.06, 0.06, 0.15, 8);
@@ -177,9 +178,9 @@ export class Player {
       const tire = new THREE.Mesh(tireGeo, blackMat);
       const rim  = new THREE.Mesh(rimGeo,  chromeMat);
       const hub  = new THREE.Mesh(hubGeo,  chromeMat);
-      tire.rotation.z = Math.PI / 2; // ring into YZ plane, axle along X
-      rim.rotation.z  = Math.PI / 2;
-      hub.rotation.z  = Math.PI / 2; // hub axis along X
+      tire.rotation.y = Math.PI / 2; // hole axis Z→X, ring into YZ plane, rolls along Z
+      rim.rotation.y  = Math.PI / 2;
+      hub.rotation.z  = Math.PI / 2; // cylinder default axis Y→X
       tire.position.copy(axlePos);
       rim.position.copy(axlePos);
       hub.position.copy(axlePos);
