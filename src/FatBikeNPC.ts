@@ -151,6 +151,6 @@ export class FatBikeNPC {
     this.mesh.position.set(pos.x, 0, pos.y);
 
     const { dirX, dirZ } = pathSystem.dirAt(this.pathDist);
-    this.mesh.rotation.y = Math.atan2(dirX * this.dir, -dirZ * this.dir);
+    this.mesh.rotation.y = Math.atan2(dirX * this.dir, dirZ * this.dir);
   }
 }

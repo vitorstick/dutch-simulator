@@ -130,7 +130,7 @@ export class Player {
     const { dirX, dirZ } = this.pathSystem.dirAt(this.pathDist);
     if (Math.abs(this.velFwd) > 0.5 || Math.abs(this.velLat) > 0.5) {
       const sign = this.velFwd >= 0 ? 1 : -1;
-      this.mesh.rotation.y = Math.atan2(dirX * sign, -dirZ * sign);
+      this.mesh.rotation.y = Math.atan2(-dirX * sign, -dirZ * sign);
     }
   }
 
