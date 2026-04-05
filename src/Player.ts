@@ -6,6 +6,16 @@ const MAX_SPEED    = 12;
 const ACCELERATION = 22;
 const FRICTION     = 18;
 
+/**
+ * Represents the player-controlled cyclist.
+ *
+ * Responsibilities:
+ * - Builds the bicycle + rider 3D mesh procedurally.
+ * - Reads keyboard input (WASD / arrow keys) each frame.
+ * - Applies momentum-based movement physics (acceleration + friction).
+ * - Constrains the cyclist to the cycle path bounds.
+ * - Rotates the mesh to always face the direction of travel.
+ */
 export class Player {
   readonly mesh: THREE.Group;
   private readonly velocity = new THREE.Vector3();
@@ -25,8 +35,21 @@ export class Player {
     window.addEventListener('keyup',   this._onKeyUp);
   }
 
+  /** Current world-space position of the cyclist (centre of the mesh group). */
   get position(): THREE.Vector3 { return this.mesh.position; }
 
+  /**
+   * Advance the player by one frame.
+   *
+   * @param delta - Elapsed time in seconds since the last frame.
+   *
+   * Each call:
+   * 1. Samples active keys and builds a normalised input vector.
+   * 2. Applies acceleration in the input direction, or friction when coasting.
+   * 3. Clamps velocity to `MAX_SPEED`.
+   * 4. Moves the mesh and clamps it inside the cycle-path boundaries.
+   * 5. Rotates the mesh to face the current velocity direction.
+   */
   update(delta: number): void {
     // ── Input ──────────────────────────────────────────────────────────────
     const input = new THREE.Vector3();
@@ -73,12 +96,20 @@ export class Player {
     }
   }
 
+  /**
+   * Teleport the cyclist back to the spawn origin and clear all motion.
+   * Called at the start of each level.
+   */
   reset(): void {
     this.mesh.position.set(0, 0, 0);
     this.velocity.set(0, 0, 0);
     this.keys.clear();
   }
 
+  /**
+   * Clean up global event listeners.
+   * Must be called if the Player instance is ever destroyed to avoid memory leaks.
+   */
   dispose(): void {
     window.removeEventListener('keydown', this._onKeyDown);
     window.removeEventListener('keyup',   this._onKeyUp);
@@ -86,6 +117,36 @@ export class Player {
 
   // ─── Mesh construction ─────────────────────────────────────────────────────
 
+  /**
+   * Procedurally build the full bicycle + rider mesh and attach it to `this.mesh`.
+   *
+   * Structure overview:
+   * ┌─ Wheels (front & rear)
+   * │    TorusGeometry tyre  (black)
+   * │    TorusGeometry rim   (chrome, smaller radius)
+   * │    CylinderGeometry hub (chrome, axle width)
+   * │    rotation.z = PI/2 so the torus ring stands upright in the YZ plane,
+   * │    meaning the wheel rolls along the Z axis (forward direction).
+   * │
+   * ├─ Diamond frame  (6 CylinderGeometry tubes via _tube())
+   * │    seat tube  · down tube  · top tube
+   * │    chain stay · seat stay  · fork (chrome)
+   * │
+   * ├─ Handlebar
+   * │    stem (chrome) + wide flat Dutch city-bike bar
+   * │
+   * ├─ Saddle + seat post
+   * │
+   * ├─ Rear rack  (Amsterdam omafiets style: rail + platform)
+   * │
+   * └─ Rider
+   *      hips · torso (orange jersey) · head (skin) · helmet (orange)
+   *      arms (tubes from shoulders to handlebar grips)
+   *
+   * All positions are expressed in the mesh's local space.
+   * The bike faces the −Z direction by default; rotation is applied by
+   * `update()` via `this.mesh.rotation.y`.
+   */
   private _buildMesh(): void {
     const orangeMat = new THREE.MeshLambertMaterial({ color: 0xff6600 });
     const chromeMat = new THREE.MeshLambertMaterial({ color: 0xbbbbbb });
@@ -194,8 +255,19 @@ export class Player {
   }
 
   /**
-   * Add a cylindrical tube from `from` to `to` to this.mesh.
-   * The cylinder's local Y axis is aligned with the from→to direction.
+   * Add a cylindrical tube between two world-space points to `this.mesh`.
+   *
+   * Used throughout `_buildMesh` to construct every strut of the bicycle frame,
+   * the fork, handlebar stem, seat post, rack rail, and rider arms.
+   *
+   * @param from   - Start point of the tube (local space).
+   * @param to     - End point of the tube (local space).
+   * @param radius - Radius of the cylinder in world units.
+   * @param mat    - Lambert material to apply to the mesh.
+   *
+   * Implementation note: Three.js `CylinderGeometry` is aligned along +Y by
+   * default, so `quaternion.setFromUnitVectors(UP, dir)` is used to rotate it
+   * to the correct orientation without any Euler angle gimbal issues.
    */
   private _tube(
     from:   THREE.Vector3,

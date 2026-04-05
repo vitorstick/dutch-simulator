@@ -12,6 +12,10 @@ import { LEVELS }                  from './LevelConfig';
 
 let _audioCtx: AudioContext | null = null;
 
+/**
+ * Lazily creates (and resumes) a single shared `AudioContext`.
+ * Returns `null` if the Web Audio API is unavailable.
+ */
 function getAudioCtx(): AudioContext | null {
   if (!_audioCtx) {
     try { _audioCtx = new AudioContext(); } catch { return null; }
@@ -20,6 +24,13 @@ function getAudioCtx(): AudioContext | null {
   return _audioCtx;
 }
 
+/**
+ * Play a short bicycle bell sound effect using the Web Audio API.
+ *
+ * Synthesised entirely in code — no audio assets required:
+ * - A sine oscillator fires at 880 Hz then jumps to 1320 Hz after 60 ms.
+ * - A gain envelope decays exponentially over 350 ms.
+ */
 function playBell(): void {
   const ctx = getAudioCtx();
   if (!ctx) return;
@@ -44,6 +55,27 @@ type GameState = 'MENU' | 'PLAYING' | 'LEVEL_COMPLETE' | 'GAME_OVER';
 
 // ─── Game class ───────────────────────────────────────────────────────────────
 
+/**
+ * Top-level game orchestrator.
+ *
+ * Owns all major subsystems and drives the game loop via `requestAnimationFrame`.
+ * Implements a simple state machine:
+ *
+ * ```
+ * MENU → PLAYING → LEVEL_COMPLETE → PLAYING (next level)
+ *                 → GAME_OVER      (0 lives)
+ *                 → GAME_OVER      (last level cleared → victory)
+ * ```
+ *
+ * Subsystems owned:
+ * - `Scene`        — renderer + Three.js scene
+ * - `IsoCamera`    — top-down camera + shake
+ * - `World`        — static Amsterdam environment
+ * - `Player`       — cyclist input + physics
+ * - `NPCManager`   — pedestrian wave spawning
+ * - `ScoreManager` — scoring + lives
+ * - `UI`           — DOM HUD + overlay screens
+ */
 export class Game {
   private readonly setup:    SceneSetup;
   private readonly camera:   IsoCamera;
@@ -61,6 +93,10 @@ export class Game {
   private timeLeft    = 0;
   private lastTime    = 0;
 
+  /**
+   * Initialise all subsystems, register global event listeners, start the
+   * render loop, and show the main menu overlay.
+   */
   constructor() {
     this.setup  = createScene();
     this.camera = new IsoCamera();
@@ -77,6 +113,14 @@ export class Game {
 
   // ─── Level management ────────────────────────────────────────────────────
 
+  /**
+   * Prepare and start a specific level.
+   *
+   * Resets the player position, score combo, and timer, then creates a fresh
+   * `NPCManager` configured from `LEVELS[index]`.
+   *
+   * @param index - Zero-based index into the `LEVELS` array.
+   */
   private _startLevel(index: number): void {
     this.levelIndex = index;
     const cfg       = LEVELS[index];
@@ -93,6 +137,14 @@ export class Game {
 
   // ─── Main loop ───────────────────────────────────────────────────────────
 
+  /**
+   * The `requestAnimationFrame` render loop entry point.
+   *
+   * Computes the frame delta (capped at 50 ms to avoid spiral-of-death on tab
+   * focus restore), calls `_update`, then issues a render call.
+   *
+   * @param now - High-resolution timestamp provided by the browser (ms).
+   */
   private _loop(now: number): void {
     requestAnimationFrame((t) => this._loop(t));
 
@@ -103,6 +155,21 @@ export class Game {
     this.setup.renderer.render(this.setup.scene, this.camera.camera);
   }
 
+  /**
+   * Per-frame game logic — only runs when `state === 'PLAYING'`.
+   *
+   * Order of operations:
+   * 1. Update player (input + physics).
+   * 2. Update all NPCs (walk + spawn).
+   * 3. Run AABB collision check; trigger hits, score, camera shake, and SFX.
+   * 4. Check win condition (`allCleared`).
+   * 5. Decrement timer; lose a life or trigger Game Over on expiry.
+   * 6. Update camera tracking and HUD.
+   *
+   * @param delta   - Elapsed time in seconds since the last frame.
+   * @param nowSec  - Current game time in seconds (used by `ScoreManager` for
+   *                  combo window detection).
+   */
   private _update(delta: number, nowSec: number): void {
     if (this.state !== 'PLAYING') return;
 
@@ -156,6 +223,11 @@ export class Game {
 
   // ─── State transitions ───────────────────────────────────────────────────
 
+  /**
+   * Called when all NPCs in the current level have been cleared.
+   * Transitions to `LEVEL_COMPLETE`, then either loads the next level or
+   * shows the victory screen if the last level was completed.
+   */
   private _onLevelComplete(): void {
     this.state = 'LEVEL_COMPLETE';
 
@@ -175,6 +247,10 @@ export class Game {
     }
   }
 
+  /**
+   * Called when the player has run out of lives.
+   * Transitions to `GAME_OVER` and shows the game over overlay.
+   */
   private _onGameOver(): void {
     this.state = 'GAME_OVER';
     this.ui.showGameOver(this.score.score, this.levelIndex + 1, () => {
@@ -185,6 +261,11 @@ export class Game {
 
   // ─── Resize ──────────────────────────────────────────────────────────────
 
+  /**
+   * Handle browser window resize events.
+   * Updates the renderer output size and recalculates the camera frustum so
+   * the scene fills the viewport correctly at any resolution.
+   */
   private _onResize(): void {
     this.setup.renderer.setSize(window.innerWidth, window.innerHeight);
     this.camera.resize();

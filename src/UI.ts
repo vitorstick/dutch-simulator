@@ -1,3 +1,15 @@
+/**
+ * Manages all DOM-based UI elements overlaid on top of the Three.js canvas.
+ *
+ * Two layers:
+ * - **HUD** (`#hud-top`): always-visible bar showing score, level, timer, and
+ *   lives. Updated every frame via `update()`.
+ * - **Overlays** (`#overlay`): full-screen panels for MENU, LEVEL_COMPLETE,
+ *   VICTORY, and GAME_OVER states. Shown/hidden via CSS class `"hidden"`.
+ *
+ * The UI deliberately uses plain DOM instead of Three.js objects so that it
+ * renders at native resolution and benefits from CSS transitions.
+ */
 export class UI {
   private readonly scoreEl:   HTMLElement;
   private readonly levelEl:   HTMLElement;
@@ -37,6 +49,16 @@ export class UI {
     this.btnEl     = document.getElementById('overlay-btn') as HTMLButtonElement;
   }
 
+  /**
+   * Refresh all live HUD elements. Should be called once per frame while in
+   * the `PLAYING` state.
+   *
+   * @param score    - Current cumulative score.
+   * @param lives    - Remaining lives (renders one 🚲 icon per life).
+   * @param combo    - Current combo multiplier; values > 1 show the combo text.
+   * @param timeLeft - Seconds remaining on the level timer.
+   * @param level    - 1-based level number displayed in the level badge.
+   */
   update(score: number, lives: number, combo: number, timeLeft: number, level: number): void {
     this.scoreEl.textContent = String(score);
     this.levelEl.textContent = `LEVEL ${level}`;
@@ -55,6 +77,10 @@ export class UI {
     }
   }
 
+  /**
+   * Show the main menu overlay.
+   * @param onStart - Callback invoked when the player clicks "START RIDING".
+   */
   showMenu(onStart: () => void): void {
     this._show(
       '🚲 DUTCH DUCHE SIMULATOR',
@@ -64,6 +90,12 @@ export class UI {
     );
   }
 
+  /**
+   * Show the level-complete overlay.
+   * @param level   - The level number just completed (1-based, for display).
+   * @param score   - Current score to display.
+   * @param onNext  - Callback invoked when the player clicks "NEXT LEVEL".
+   */
   showLevelComplete(level: number, score: number, onNext: () => void): void {
     this._show(
       '✅ PATH CLEARED!',
@@ -73,6 +105,11 @@ export class UI {
     );
   }
 
+  /**
+   * Show the all-levels-cleared victory overlay.
+   * @param score      - Final score to display.
+   * @param onRestart  - Callback invoked when the player clicks "RIDE AGAIN".
+   */
   showVictory(score: number, onRestart: () => void): void {
     this._show(
       '🏆 AMSTERDAM IS YOURS!',
@@ -82,6 +119,12 @@ export class UI {
     );
   }
 
+  /**
+   * Show the game over overlay.
+   * @param score      - Final score to display.
+   * @param level      - Level the player reached (1-based).
+   * @param onRestart  - Callback invoked when the player clicks "RIDE AGAIN".
+   */
   showGameOver(score: number, level: number, onRestart: () => void): void {
     this._show(
       '💥 GAME OVER',
@@ -91,12 +134,22 @@ export class UI {
     );
   }
 
+  /** Hides the overlay panel without triggering any callback. */
   hideOverlay(): void {
     this.overlayEl.classList.add('hidden');
   }
 
   // ─── Private ───────────────────────────────────────────────────────────────
 
+  /**
+   * Populate and reveal the shared overlay panel.
+   *
+   * @param title    - Large heading text.
+   * @param body     - HTML string for the description paragraph.
+   * @param btnLabel - Label for the call-to-action button.
+   * @param onPress  - Callback fired when the button is clicked; the overlay
+   *                   is automatically hidden before the callback runs.
+   */
   private _show(
     title: string,
     body:  string,
