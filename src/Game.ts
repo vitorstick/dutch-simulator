@@ -122,11 +122,13 @@ export class Game {
    */
   private _showMenu(): void {
     this.state = 'MENU';
-    this.ui.showMenu(loadLeaderboard(), (name) => {
+    this.ui.showMenu([], (name) => {
       this.playerName = name;
       this._hardReset();
       this._startLevel(0);
     });
+    // Fetch global scores in the background; refresh table when ready
+    void loadLeaderboard().then(entries => this.ui.refreshLeaderboard(entries));
   }
 
   // ─── Level management ────────────────────────────────────────────────────
@@ -283,8 +285,7 @@ export class Game {
 
     const nextIndex = this.levelIndex + 1;
     if (nextIndex >= LEVELS.length) {
-      saveScore(this.playerName, this.score.score);
-      this.ui.showVictory(this.score.score, () => {
+      void saveScore(this.playerName, this.score.score);(this.score.score, () => {
         this.score.fullReset();
         this._showMenu();
       });
@@ -301,7 +302,7 @@ export class Game {
    */
   private _onGameOver(): void {
     this.state = 'GAME_OVER';
-    saveScore(this.playerName, this.score.score);
+    void saveScore(this.playerName, this.score.score);
     this.ui.showGameOver(this.score.score, this.levelIndex + 1, () => {
       this.score.fullReset();
       this._showMenu();

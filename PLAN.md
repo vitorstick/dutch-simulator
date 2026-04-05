@@ -185,7 +185,7 @@ dutch-duche-simulator/
 
 ### Phase C — Rewrite `src/Leaderboard.ts`
 
-- [ ] Make both functions `async`, calling Supabase REST directly via `fetch()`:
+- [x] Make both functions `async`, calling Supabase REST directly via `fetch()`:
   - `loadLeaderboard()` → `GET /rest/v1/scores?select=name,score&order=score.desc&limit=10` — returns `[]` on any error (works offline)
   - `saveScore()` → `POST /rest/v1/scores` with `{ name, score }` body — fire-and-forget, silently ignores network failures
   - Headers: `apikey: ANON_KEY`, `Authorization: Bearer ANON_KEY`, `Content-Type: application/json`
@@ -193,16 +193,16 @@ dutch-duche-simulator/
 
 ### Phase D — Update `src/UI.ts`
 
-- [ ] `showMenu(entries, onStart)` signature unchanged — called immediately with `[]` so the menu appears without waiting on the network; initial empty state renders a "Loading…" row
-- [ ] Add `refreshLeaderboard(entries: LeaderboardEntry[])` method — replaces only the table body once data arrives
+- [x] `showMenu(entries, onStart)` signature unchanged — called immediately with `[]` so the menu appears without waiting on the network; initial empty state renders a "Loading…" row
+- [x] Add `refreshLeaderboard(entries: LeaderboardEntry[])` method — replaces only the table body once data arrives
 
 ### Phase E — Update `src/Game.ts`
 
-- [ ] `_showMenu()` becomes `async`:
+- [x] `_showMenu()` becomes `async`:
   - Calls `this.ui.showMenu([], onStart)` immediately (no delay for the player)
   - Kicks off `loadLeaderboard()` concurrently
   - On resolve → `this.ui.refreshLeaderboard(entries)`
-- [ ] `saveScore()` calls in `_onLevelComplete` / `_onGameOver` remain fire-and-forget (`void saveScore(...)`) — game flow never blocks on the network
+- [x] `saveScore()` calls in `_onLevelComplete` / `_onGameOver` remain fire-and-forget (`void saveScore(...)`) — game flow never blocks on the network
 
 ### Phase F — Cloudflare Pages Deployment
 

@@ -3,36 +3,50 @@ export interface LeaderboardEntry {
   score: number;
 }
 
-const STORAGE_KEY = 'dutch_duche_leaderboard';
-const MAX_ENTRIES = 10;
+const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-/** Load the persisted top-score list from localStorage (safe, never throws). */
-export function loadLeaderboard(): LeaderboardEntry[] {
+const HEADERS = {
+  'apikey':        SUPABASE_ANON_KEY,
+  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+  'Content-Type':  'application/json',
+};
+
+/**
+ * Fetch the top-10 global scores from Supabase.
+ * Returns `[]` silently on any network or parse error so the game works
+ * offline and the menu always renders.
+ */
+export async function loadLeaderboard(): Promise<LeaderboardEntry[]> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return (parsed as LeaderboardEntry[])
-      .filter(e => typeof e.name === 'string' && typeof e.score === 'number')
-      .slice(0, MAX_ENTRIES);
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/scores?select=name,score&order=score.desc&limit=10`,
+      { headers: HEADERS },
+    );
+    if (!res.ok) return [];
+    const data = await res.json() as unknown;
+    if (!Array.isArray(data)) return [];
+    return (data as LeaderboardEntry[]).filter(
+      e => typeof e.name === 'string' && typeof e.score === 'number',
+    );
   } catch {
     return [];
   }
 }
 
 /**
- * Append a new entry, sort descending by score, keep top 10, and persist.
- * Silently ignores storage errors (private browsing, quota exceeded, etc.).
+ * Post a new score entry to Supabase. Fire-and-forget — never throws.
+ * Network failures are silently ignored so game flow is never blocked.
  */
-export function saveScore(name: string, score: number): void {
-  const entries = loadLeaderboard();
+export async function saveScore(name: string, score: number): Promise<void> {
   const safeName = (name.trim() || 'ANON').slice(0, 20);
-  entries.push({ name: safeName, score });
-  entries.sort((a, b) => b.score - a.score);
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries.slice(0, MAX_ENTRIES)));
+    await fetch(`${SUPABASE_URL}/rest/v1/scores`, {
+      method:  'POST',
+      headers: HEADERS,
+      body:    JSON.stringify({ name: safeName, score }),
+    });
   } catch {
-    // Storage full or unavailable — silently ignore
+    // Network unavailable — silently ignore
   }
 }

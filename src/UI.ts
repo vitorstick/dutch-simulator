@@ -89,18 +89,11 @@ export class UI {
   showMenu(entries: LeaderboardEntry[], onStart: (name: string) => void): void {
     this.titleEl.textContent = '🚲 DUTCH DUCHE SIMULATOR';
 
-    const medalFor = (i: number) => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
-    const rows = entries.length === 0
-      ? `<tr><td colspan="3" class="lb-empty">No scores yet — be the first!</td></tr>`
-      : entries.slice(0, 10).map((e, i) =>
-          `<tr class="lb-row lb-rank-${i}"><td class="lb-rank">${medalFor(i)}</td><td class="lb-name">${this._esc(e.name)}</td><td class="lb-score">${e.score}</td></tr>`
-        ).join('');
-
     this.bodyEl.innerHTML = `
       <p class="menu-tagline">Ride your bike and clear the cycle path!<br>Use <b>WASD</b> or <b>Arrow Keys</b> to move.</p>
       <div class="leaderboard">
         <h3>🏆 TOP SCORES</h3>
-        <table>${rows}</table>
+        <table id="lb-table">${this._buildRows(entries, true)}</table>
       </div>
       <div class="name-entry">
         <label for="player-name">YOUR NAME</label>
@@ -124,6 +117,15 @@ export class UI {
       });
       setTimeout(() => nameInput.focus(), 60);
     }
+  }
+
+  /**
+   * Replace the leaderboard table content once async data has loaded.
+   * Safe to call even if the menu overlay is no longer visible.
+   */
+  refreshLeaderboard(entries: LeaderboardEntry[]): void {
+    const table = document.getElementById('lb-table');
+    if (table) table.innerHTML = this._buildRows(entries, false);
   }
 
   /**
@@ -184,6 +186,23 @@ export class UI {
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  /**
+   * Build the inner HTML for the leaderboard `<table>`.
+   * @param entries  - Score entries to render.
+   * @param loading  - When `true` and entries is empty, shows a "Loading…" row
+   *                   instead of "No scores yet".
+   */
+  private _buildRows(entries: LeaderboardEntry[], loading: boolean): string {
+    if (entries.length === 0) {
+      const msg = loading ? 'Loading…' : 'No scores yet — be the first!';
+      return `<tr><td colspan="3" class="lb-empty">${msg}</td></tr>`;
+    }
+    const medalFor = (i: number) => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+    return entries.slice(0, 10).map((e, i) =>
+      `<tr class="lb-row lb-rank-${i}"><td class="lb-rank">${medalFor(i)}</td><td class="lb-name">${this._esc(e.name)}</td><td class="lb-score">${e.score}</td></tr>`
+    ).join('');
   }
 
   /**
