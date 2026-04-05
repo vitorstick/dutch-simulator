@@ -5,7 +5,6 @@ import { CYCLE_PATH_HALF_WIDTH, PATH_HALF_LENGTH } from './World';
 const MAX_SPEED    = 12;
 const ACCELERATION = 22;
 const FRICTION     = 18;
-const RIDE_HEIGHT  = 1.5; // wheel axle height
 
 export class Player {
   readonly mesh: THREE.Group;
@@ -88,50 +87,134 @@ export class Player {
   // ─── Mesh construction ─────────────────────────────────────────────────────
 
   private _buildMesh(): void {
-    // Bike frame
-    const frameGeo = new THREE.BoxGeometry(0.45, 0.55, 0.85);
-    const frameMat = new THREE.MeshLambertMaterial({ color: 0xff6600 });
-    const frame    = new THREE.Mesh(frameGeo, frameMat);
-    frame.position.y  = RIDE_HEIGHT;
-    frame.castShadow  = true;
-    this.mesh.add(frame);
+    const orangeMat = new THREE.MeshLambertMaterial({ color: 0xff6600 });
+    const chromeMat = new THREE.MeshLambertMaterial({ color: 0xbbbbbb });
+    const blackMat  = new THREE.MeshLambertMaterial({ color: 0x111111 });
+    const skinMat   = new THREE.MeshLambertMaterial({ color: 0xffcc88 });
+    const saddleMat = new THREE.MeshLambertMaterial({ color: 0x1a1008 });
+    const rackMat   = new THREE.MeshLambertMaterial({ color: 0x888888 });
+    const armMat    = new THREE.MeshLambertMaterial({ color: 0xff7722 });
 
-    // Wheels
-    const wheelGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.1, 12);
-    const wheelMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
+    const WR = 0.34; // wheel radius = hub axle height
 
-    const frontWheel = new THREE.Mesh(wheelGeo, wheelMat);
-    frontWheel.rotation.x = Math.PI / 2;
-    frontWheel.position.set(0, 0.35, 0.45);
-    frontWheel.castShadow = true;
-    this.mesh.add(frontWheel);
+    // ── Key frame joints (bike faces -Z direction) ──────────────────────────
+    const RA = new THREE.Vector3(0, WR,   0.50);  // rear axle
+    const FA = new THREE.Vector3(0, WR,  -0.50);  // front axle
+    const BB = new THREE.Vector3(0, 0.32, 0.08);  // bottom bracket (pedal spindle)
+    const ST = new THREE.Vector3(0, 0.90, 0.18);  // seat tube top / saddle rail
+    const HT = new THREE.Vector3(0, 0.74, -0.42); // head tube top (stem)
+    const HB = new THREE.Vector3(0, 0.48, -0.36); // head tube bottom / fork crown
 
-    const backWheel = frontWheel.clone();
-    backWheel.position.set(0, 0.35, -0.45);
-    this.mesh.add(backWheel);
+    // ── Wheels ──────────────────────────────────────────────────────────────
+    // TorusGeometry default ring is in XY plane (hole along Z).
+    // rotation.y = PI/2 → hole faces along X = wheel axle direction.
+    const tireGeo = new THREE.TorusGeometry(WR,        0.075, 6, 18);
+    const rimGeo  = new THREE.TorusGeometry(WR * 0.72, 0.025, 6, 18);
+    const hubGeo  = new THREE.CylinderGeometry(0.06, 0.06, 0.15, 8);
 
-    // Rider torso — Dutch national orange jersey
-    const torsoGeo = new THREE.BoxGeometry(0.38, 0.75, 0.28);
-    const torsoMat = new THREE.MeshLambertMaterial({ color: 0xff6600 });
-    const torso    = new THREE.Mesh(torsoGeo, torsoMat);
-    torso.position.y  = RIDE_HEIGHT + 0.35;
-    torso.rotation.x  = 0.35; // forward lean
+    for (const axlePos of [RA, FA]) {
+      const tire = new THREE.Mesh(tireGeo, blackMat);
+      const rim  = new THREE.Mesh(rimGeo,  chromeMat);
+      const hub  = new THREE.Mesh(hubGeo,  chromeMat);
+      tire.rotation.z = Math.PI / 2; // ring into YZ plane, axle along X
+      rim.rotation.z  = Math.PI / 2;
+      hub.rotation.z  = Math.PI / 2; // hub axis along X
+      tire.position.copy(axlePos);
+      rim.position.copy(axlePos);
+      hub.position.copy(axlePos);
+      tire.castShadow = true;
+      this.mesh.add(tire, rim, hub);
+    }
+
+    // ── Diamond frame ───────────────────────────────────────────────────────
+    this._tube(BB, ST,  0.050, orangeMat); // seat tube
+    this._tube(BB, HB,  0.052, orangeMat); // down tube
+    this._tube(ST, HT,  0.042, orangeMat); // top tube
+    this._tube(BB, RA,  0.036, orangeMat); // chain stay
+    this._tube(ST, RA,  0.034, orangeMat); // seat stay
+    this._tube(HB, FA,  0.040, chromeMat); // fork
+
+    // ── Handlebar ───────────────────────────────────────────────────────────
+    const hbarTop = new THREE.Vector3(0, 0.93, -0.43);
+    this._tube(HT, hbarTop, 0.022, chromeMat); // stem
+    this._tube(                                // Dutch upright bar
+      new THREE.Vector3(-0.30, 0.93, -0.43),
+      new THREE.Vector3( 0.30, 0.93, -0.43),
+      0.022, chromeMat,
+    );
+
+    // ── Saddle & seat post ───────────────────────────────────────────────────
+    const saddleGeo = new THREE.BoxGeometry(0.12, 0.04, 0.36);
+    const saddle    = new THREE.Mesh(saddleGeo, saddleMat);
+    saddle.position.set(ST.x, ST.y + 0.04, ST.z);
+    this.mesh.add(saddle);
+    this._tube(ST, new THREE.Vector3(ST.x, ST.y + 0.1, ST.z), 0.022, chromeMat);
+
+    // ── Rear rack (Amsterdam omafiets style) ─────────────────────────────────
+    this._tube(ST, new THREE.Vector3(0, ST.y, RA.z), 0.018, rackMat);
+    const rackGeo  = new THREE.BoxGeometry(0.30, 0.025, 0.28);
+    const rackPlat = new THREE.Mesh(rackGeo, rackMat);
+    rackPlat.position.set(0, ST.y + 0.02, (ST.z + RA.z) * 0.5);
+    this.mesh.add(rackPlat);
+
+    // ── Rider ────────────────────────────────────────────────────────────────
+    // Hips (on saddle)
+    const hipsGeo = new THREE.BoxGeometry(0.26, 0.18, 0.20);
+    const hips    = new THREE.Mesh(hipsGeo, orangeMat);
+    hips.position.set(0, ST.y + 0.16, ST.z - 0.02);
+    hips.castShadow = true;
+    this.mesh.add(hips);
+
+    // Torso (slight forward lean — city bike upright posture)
+    const torsoGeo = new THREE.BoxGeometry(0.28, 0.52, 0.22);
+    const torso    = new THREE.Mesh(torsoGeo, orangeMat);
+    torso.position.set(0, ST.y + 0.54, ST.z - 0.06);
+    torso.rotation.x  = 0.20;
     torso.castShadow  = true;
     this.mesh.add(torso);
 
     // Head
-    const headGeo = new THREE.SphereGeometry(0.21, 8, 6);
-    const headMat = new THREE.MeshLambertMaterial({ color: 0xffcc99 });
-    const head    = new THREE.Mesh(headGeo, headMat);
-    head.position.set(0, RIDE_HEIGHT + 0.85, -0.1);
+    const headGeo = new THREE.SphereGeometry(0.17, 8, 7);
+    const head    = new THREE.Mesh(headGeo, skinMat);
+    head.position.set(0, ST.y + 1.01, ST.z - 0.18);
     head.castShadow = true;
     this.mesh.add(head);
 
-    // Helmet (half-sphere)
-    const helmetGeo = new THREE.SphereGeometry(0.25, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2);
-    const helmetMat = new THREE.MeshLambertMaterial({ color: 0xff6600 });
-    const helmet    = new THREE.Mesh(helmetGeo, helmetMat);
-    helmet.position.set(0, RIDE_HEIGHT + 0.97, -0.1);
+    // Helmet (half-sphere cap)
+    const helmetGeo = new THREE.SphereGeometry(0.20, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2);
+    const helmet    = new THREE.Mesh(helmetGeo, orangeMat);
+    helmet.position.set(0, ST.y + 1.10, ST.z - 0.18);
     this.mesh.add(helmet);
+
+    // Arms from shoulders to handlebar grips
+    const shoulderL = new THREE.Vector3( 0.15, ST.y + 0.74, ST.z - 0.08);
+    const shoulderR = new THREE.Vector3(-0.15, ST.y + 0.74, ST.z - 0.08);
+    this._tube(shoulderL, new THREE.Vector3( 0.26, 0.93, -0.43), 0.044, armMat);
+    this._tube(shoulderR, new THREE.Vector3(-0.26, 0.93, -0.43), 0.044, armMat);
+  }
+
+  /**
+   * Add a cylindrical tube from `from` to `to` to this.mesh.
+   * The cylinder's local Y axis is aligned with the from→to direction.
+   */
+  private _tube(
+    from:   THREE.Vector3,
+    to:     THREE.Vector3,
+    radius: number,
+    mat:    THREE.MeshLambertMaterial,
+  ): void {
+    const dir    = new THREE.Vector3().subVectors(to, from);
+    const length = dir.length();
+    if (length < 0.001) return;
+    const mid  = new THREE.Vector3().lerpVectors(from, to, 0.5);
+    const geo  = new THREE.CylinderGeometry(radius, radius, length, 6);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.copy(mid);
+    mesh.quaternion.setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      dir.normalize(),
+    );
+    mesh.castShadow = true;
+    this.mesh.add(mesh);
   }
 }
