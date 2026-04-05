@@ -81,6 +81,7 @@ export class Player {
     }
   }
 
+  /** Full reset: teleport back to path start and clear all motion. */
   reset(): void {
     this.pathDist = 5;
     this.lateral  = 0;
@@ -88,6 +89,13 @@ export class Player {
     this.velLat   = 0;
     this.keys.clear();
     this._syncWorldPos();
+  }
+
+  /** Soft reset: keep current position but clear velocity and held keys. */
+  softReset(): void {
+    this.velFwd = 0;
+    this.velLat = 0;
+    this.keys.clear();
   }
 
   dispose(): void {

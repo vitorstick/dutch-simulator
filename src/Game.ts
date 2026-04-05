@@ -109,7 +109,10 @@ export class Game {
     window.addEventListener('resize', this._onResize.bind(this));
 
     this._loop(performance.now());
-    this.ui.showMenu(() => this._startLevel(0));
+    this.ui.showMenu(() => {
+      this._hardReset();
+      this._startLevel(0);
+    });
   }
 
   // ─── Level management ────────────────────────────────────────────────────
@@ -128,19 +131,20 @@ export class Game {
     this.timeLeft   = cfg.timeLimit;
 
     this.score.resetLevel();
-
-    // Reset path and world geometry so the player always restarts at pathDist=5
-    // on a valid segment (pruned segments from a previous run are wiped).
-    this.pathSystem.reset();
-    this.world.reset();
-    this.world.update(this.pathSystem);
-
-    this.player.reset();
+    this.player.softReset();
 
     if (this.npcManager) this.npcManager.clear();
     this.npcManager = new NPCManager(this.setup.scene, cfg, this.pathSystem);
 
     this.state = 'PLAYING';
+  }
+
+  /** Full reset: wipe path, world geometry, and teleport player to the start. */
+  private _hardReset(): void {
+    this.pathSystem.reset();
+    this.world.reset();
+    this.world.update(this.pathSystem);
+    this.player.reset();
   }
 
   // ─── Main loop ───────────────────────────────────────────────────────────
@@ -230,7 +234,8 @@ export class Game {
       if (this.score.isGameOver) {
         this._onGameOver();
       } else {
-        // Time ran out — restart same level (lose a life)
+        // Time ran out — restart same level (lose a life), reset to path start
+        this._hardReset();
         this._startLevel(this.levelIndex);
       }
       return;
@@ -265,6 +270,7 @@ export class Game {
     if (nextIndex >= LEVELS.length) {
       this.ui.showVictory(this.score.score, () => {
         this.score.fullReset();
+        this._hardReset();
         this._startLevel(0);
       });
     } else {
@@ -282,6 +288,7 @@ export class Game {
     this.state = 'GAME_OVER';
     this.ui.showGameOver(this.score.score, this.levelIndex + 1, () => {
       this.score.fullReset();
+      this._hardReset();
       this._startLevel(0);
     });
   }
