@@ -2,10 +2,13 @@
 import { clamp } from './utils';
 import { PathSystem, CYCLE_PATH_HALF_WIDTH } from './PathSystem';
 
-const MAX_SPEED_FWD = 12;
-const MAX_SPEED_LAT = 6;
-const ACCELERATION  = 22;
-const FRICTION      = 18;
+const MAX_SPEED_FWD  = 12;
+const MAX_SPEED_LAT  = 6;
+const ACCELERATION   = 22;
+const FRICTION       = 18;
+const HIT_DURATION   = 0.55;  // seconds the knockback animation plays
+const HIT_KNOCKBACK  = -6;    // fwd impulse applied on impact (pushes backward)
+const HIT_LAT_RANGE  = 4;     // max random lateral impulse on impact
 
 export class Player {
   readonly mesh: THREE.Group;
@@ -14,6 +17,10 @@ export class Player {
   private lateral:   number = 0;
   private velFwd:    number = 0;
   private velLat:    number = 0;
+
+  // Hit-animation state
+  private hitTimer:    number  = 0;
+  private isHit:       boolean = false;
 
   private readonly pathSystem: PathSystem;
   private readonly keys = new Set<string>();
@@ -37,8 +44,54 @@ export class Player {
 
   get position(): THREE.Vector3 { return this.mesh.position; }
   get pathDistance(): number     { return this.pathDist; }
+  /** True while the knockback animation is playing — input is locked. */
+  get isBeingHit(): boolean      { return this.isHit; }
+
+  /**
+   * Trigger the fat-bike knockback animation.
+   * Applies a backward velocity impulse + random lateral shove.
+   */
+  hitByFatBike(): void {
+    if (this.isHit) return;  // don't interrupt ongoing animation
+    this.isHit    = true;
+    this.hitTimer = 0;
+    // Velocity impulse: sent flying backward and to one side
+    this.velFwd = HIT_KNOCKBACK;
+    this.velLat = (Math.random() - 0.5) * 2 * HIT_LAT_RANGE;
+  }
 
   update(delta: number): void {
+    // ── Hit animation (locks input) ────────────────────────────────────────
+    if (this.isHit) {
+      this.hitTimer += delta;
+      const t = Math.min(this.hitTimer / HIT_DURATION, 1);
+
+      // Velocity still applies so the bike slides backward during tumble
+      this.pathDist += this.velFwd * delta;
+      this.lateral  += this.velLat * delta;
+      if (this.pathDist < 0) { this.pathDist = 0; this.velFwd = 0; }
+      this.lateral = clamp(this.lateral, -(CYCLE_PATH_HALF_WIDTH - 0.5), CYCLE_PATH_HALF_WIDTH - 0.5);
+
+      // Friction during tumble
+      const decF = Math.min(FRICTION * delta, Math.abs(this.velFwd));
+      this.velFwd -= Math.sign(this.velFwd) * decF;
+      const decL = Math.min(FRICTION * delta, Math.abs(this.velLat));
+      this.velLat -= Math.sign(this.velLat) * decL;
+
+      this._syncWorldPos();
+
+      // Spin 360° on Z, arc up then back to ground
+      this.mesh.rotation.z = Math.sin(t * Math.PI) * Math.PI;
+      this.mesh.position.y = Math.sin(t * Math.PI) * 1.8;
+
+      if (t >= 1) {
+        this.isHit             = false;
+        this.mesh.rotation.z   = 0;
+        this.mesh.position.y   = 0;
+      }
+      return;
+    }
+
     const fwd = (this.keys.has('KeyW') || this.keys.has('ArrowUp'))    ? 1
               : (this.keys.has('KeyS') || this.keys.has('ArrowDown'))  ? -1 : 0;
     const lat = (this.keys.has('KeyD') || this.keys.has('ArrowRight')) ? 1

@@ -212,7 +212,8 @@ export class Game {
       for (const bike of fatBikeHits) {
         bike.onHitPlayer();
         this.score.loseLife();
-        this.camera.shake();
+        this.player.hitByFatBike();
+        this.camera.shake(1.4);
         if (this.score.isGameOver) {
           this._onGameOver();
           return;
