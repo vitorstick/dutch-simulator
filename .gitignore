@@ -1,0 +1,24 @@
+# Node
+node_modules/
+
+# Build outputs
+dist/
+.vite/
+build/
+
+# Env files
+.env
+
+# Logs
+*.log
+npm-debug.log*
+Yarn-error.log*
+
+# OS files
+.DS_Store
+
+# VS Code
+.vscode/
+
+# Coverage
+coverage/
