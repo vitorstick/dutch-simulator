@@ -34,27 +34,33 @@ export class FatBikeNPC {
 
     const color = FAT_BIKE_COLORS[Math.floor(Math.random() * FAT_BIKE_COLORS.length)];
 
-    const wheelGeo = new THREE.CylinderGeometry(WHEEL_RADIUS, WHEEL_RADIUS, WHEEL_WIDTH, 14);
+    const WR       = WHEEL_RADIUS;
+    const tireGeo  = new THREE.TorusGeometry(WR, 0.13, 8, 18);
+    const rimGeo   = new THREE.TorusGeometry(WR * 0.72, 0.03, 6, 18);
+    const hubGeo   = new THREE.CylinderGeometry(0.07, 0.07, WHEEL_WIDTH, 8);
     const wheelMat = new THREE.MeshLambertMaterial({ color: WHEEL_COLOR });
+    const rimMat   = new THREE.MeshLambertMaterial({ color: 0x888888 });
 
-    this.frontWheel            = new THREE.Mesh(wheelGeo, wheelMat);
-    this.frontWheel.rotation.z = Math.PI / 2;
-    this.frontWheel.position.set(0, WHEEL_RADIUS, 0.48);
+    this.frontWheel = new THREE.Mesh(tireGeo, wheelMat);
+    this.frontWheel.rotation.y = Math.PI / 2;
+    this.frontWheel.position.set(0, WR, 0.52);
     this.frontWheel.castShadow = true;
 
-    this.backWheel             = new THREE.Mesh(wheelGeo, wheelMat);
-    this.backWheel.rotation.z  = Math.PI / 2;
-    this.backWheel.position.set(0, WHEEL_RADIUS, -0.48);
-    this.backWheel.castShadow  = true;
+    this.backWheel = new THREE.Mesh(tireGeo, wheelMat);
+    this.backWheel.rotation.y = Math.PI / 2;
+    this.backWheel.position.set(0, WR, -0.52);
+    this.backWheel.castShadow = true;
 
     this.mesh.add(this.frontWheel, this.backWheel);
 
-    const treadGeo = new THREE.TorusGeometry(WHEEL_RADIUS, 0.06, 8, 14);
-    const treadMat = new THREE.MeshLambertMaterial({ color: 0x333333 });
-    for (const wz of [0.48, -0.48]) {
-      const tread = new THREE.Mesh(treadGeo, treadMat);
-      tread.position.set(0, WHEEL_RADIUS, wz);
-      this.mesh.add(tread);
+    for (const axleZ of [0.52, -0.52]) {
+      const rim = new THREE.Mesh(rimGeo, rimMat);
+      const hub = new THREE.Mesh(hubGeo, rimMat);
+      rim.rotation.y = Math.PI / 2;
+      hub.rotation.z = Math.PI / 2;
+      rim.position.set(0, WR, axleZ);
+      hub.position.set(0, WR, axleZ);
+      this.mesh.add(rim, hub);
     }
 
     const frameGeo = new THREE.BoxGeometry(0.22, 0.18, 0.95);
