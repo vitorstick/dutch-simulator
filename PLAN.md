@@ -150,9 +150,79 @@ dutch-duche-simulator/
 
 ---
 
+## Phase 10 — Backend Leaderboard (Supabase + Cloudflare Pages)
+
+**Stack:** Supabase (PostgreSQL, REST API) · Cloudflare Pages (static hosting) · raw `fetch()` — no new npm dependency
+
+### Phase A — Supabase Setup *(manual — done in the Supabase dashboard)*
+
+- [x] Create a new project at supabase.com
+- [x] Run the following SQL in the SQL Editor:
+  ```sql
+  create table scores (
+    id         bigserial primary key,
+    name       text        not null check (char_length(name) <= 20),
+    score      int8        not null check (score >= 0),
+    created_at timestamptz not null default now()
+  );
+  alter table scores enable row level security;
+  create policy "Anyone can read scores"
+    on scores for select using (true);
+  create policy "Anyone can insert scores"
+    on scores for insert with check (true);
+  ```
+- [x] From **Project Settings → API**: copy the **Project URL** and **anon/public key**
+
+### Phase B — Environment Variables
+
+- [x] Create `.env.local` (never committed):
+  ```
+  VITE_SUPABASE_URL=https://xxxx.supabase.co
+  VITE_SUPABASE_ANON_KEY=eyJ...
+  ```
+- [x] Create `.env.example` (committed, placeholder values) so the repo self-documents its config needs
+- [x] Verify `.gitignore` already ignores `.env.local` (Vite default does)
+
+### Phase C — Rewrite `src/Leaderboard.ts`
+
+- [ ] Make both functions `async`, calling Supabase REST directly via `fetch()`:
+  - `loadLeaderboard()` → `GET /rest/v1/scores?select=name,score&order=score.desc&limit=10` — returns `[]` on any error (works offline)
+  - `saveScore()` → `POST /rest/v1/scores` with `{ name, score }` body — fire-and-forget, silently ignores network failures
+  - Headers: `apikey: ANON_KEY`, `Authorization: Bearer ANON_KEY`, `Content-Type: application/json`
+  - `LeaderboardEntry` interface unchanged
+
+### Phase D — Update `src/UI.ts`
+
+- [ ] `showMenu(entries, onStart)` signature unchanged — called immediately with `[]` so the menu appears without waiting on the network; initial empty state renders a "Loading…" row
+- [ ] Add `refreshLeaderboard(entries: LeaderboardEntry[])` method — replaces only the table body once data arrives
+
+### Phase E — Update `src/Game.ts`
+
+- [ ] `_showMenu()` becomes `async`:
+  - Calls `this.ui.showMenu([], onStart)` immediately (no delay for the player)
+  - Kicks off `loadLeaderboard()` concurrently
+  - On resolve → `this.ui.refreshLeaderboard(entries)`
+- [ ] `saveScore()` calls in `_onLevelComplete` / `_onGameOver` remain fire-and-forget (`void saveScore(...)`) — game flow never blocks on the network
+
+### Phase F — Cloudflare Pages Deployment
+
+- [ ] New Pages project → connect Git repo
+  - Build command: `npm run build` · Output directory: `dist`
+  - Set `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` in the Pages environment variables dashboard
+  - `vite.config.ts` already has `base: './'` — no changes needed
+
+### Verification
+
+- [ ] Open menu → "Loading…" row briefly → global top-10 scores appear
+- [ ] Complete a run → entry visible in Supabase dashboard under `scores` table
+- [ ] Open in a different browser/device → same global leaderboard visible
+- [ ] `npm run build` — zero errors, `dist/` created
+- [ ] Deploy to Cloudflare Pages → game loads, leaderboard fetches from Supabase
+
+---
+
 ## Out of Scope (for now)
 
 - Mobile / touch controls
 - External 3D model assets (`.glb`, `.fbx`)
 - Multiplayer
-- Backend / leaderboard
