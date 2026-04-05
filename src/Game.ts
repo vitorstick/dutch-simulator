@@ -109,6 +109,14 @@ export class Game {
     this.world.update(this.pathSystem);
 
     window.addEventListener('resize', this._onResize.bind(this));
+    // Toggle camera view (isometric <-> third-person) with V
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyV') {
+        const mode = this.camera.toggleMode();
+        const label = mode === 'third' ? 'Third-Person View' : 'Isometric View';
+        this.ui.showHint(`View: ${label}`);
+      }
+    });
 
     this._loop(performance.now());
     this._showMenu();

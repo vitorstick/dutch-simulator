@@ -18,6 +18,8 @@ export class UI {
   private readonly timerEl:   HTMLElement;
   private readonly livesEl:   HTMLElement;
   private readonly comboEl:   HTMLElement;
+  private readonly hintEl:    HTMLElement;
+  private hintTimer: number | null = null;
   private readonly overlayEl: HTMLElement;
   private readonly titleEl:   HTMLElement;
   private readonly bodyEl:    HTMLElement;
@@ -45,6 +47,11 @@ export class UI {
     this.timerEl   = document.getElementById('hud-timer')!;
     this.livesEl   = document.getElementById('hud-lives')!;
     this.comboEl   = document.getElementById('hud-combo')!;
+    // transient hint element shown briefly when view/mode changes
+    this.hintEl = document.createElement('div');
+    this.hintEl.id = 'hud-hint';
+    this.hintEl.className = 'hidden';
+    hud.appendChild(this.hintEl);
     this.overlayEl = document.getElementById('overlay')!;
     this.titleEl   = document.getElementById('overlay-title')!;
     this.bodyEl    = document.getElementById('overlay-body')!;
@@ -77,6 +84,25 @@ export class UI {
       this.comboEl.textContent = '';
       this.comboEl.classList.remove('pop');
     }
+  }
+
+  /** Show a brief on-screen hint near the HUD (auto-hides). */
+  showHint(text: string, duration = 1400): void {
+    if (this.hintTimer) {
+      window.clearTimeout(this.hintTimer);
+      this.hintTimer = null;
+    }
+    this.hintEl.textContent = text;
+    this.hintEl.classList.remove('hidden');
+    this.hintEl.classList.remove('fade-out');
+    void this.hintEl.offsetWidth; // force reflow so animations restart
+    this.hintTimer = window.setTimeout(() => {
+      this.hintEl.classList.add('fade-out');
+      this.hintTimer = window.setTimeout(() => {
+        this.hintEl.classList.add('hidden');
+        this.hintTimer = null;
+      }, 260);
+    }, duration) as unknown as number;
   }
 
   /**
