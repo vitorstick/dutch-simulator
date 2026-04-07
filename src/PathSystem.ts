@@ -119,12 +119,22 @@ export class PathSystem {
   getWorldPos(pathDist: number, lateral: number): THREE.Vector2 {
     const seg = this.segmentAt(pathDist);
     if (!seg) {
-      // Past the end of generated segments — clamp to last endpoint
-      const s = this.segments[this.segments.length - 1];
-      if (!s) return new THREE.Vector2(0, 0);
+      // If there are no segments, return origin
+      if (this.segments.length === 0) return new THREE.Vector2(0, 0);
+      const first = this.segments[0];
+      const last  = this.segments[this.segments.length - 1];
+      // If requested distance is before the first generated segment,
+      // clamp to the first segment's start point (plus lateral offset).
+      if (pathDist < first.startDist) {
+        return new THREE.Vector2(
+          first.startX + (-first.dirZ) * lateral,
+          first.startZ + ( first.dirX) * lateral,
+        );
+      }
+      // Otherwise clamp to the last endpoint (past the end).
       return new THREE.Vector2(
-        s.endX + (-s.dirZ) * lateral,
-        s.endZ + ( s.dirX) * lateral,
+        last.endX + (-last.dirZ) * lateral,
+        last.endZ + ( last.dirX) * lateral,
       );
     }
     const t = pathDist - seg.startDist;   // distance along this segment
@@ -142,8 +152,12 @@ export class PathSystem {
   dirAt(pathDist: number): { dirX: number; dirZ: number } {
     const seg = this.segmentAt(pathDist);
     if (!seg) {
-      const s = this.segments[this.segments.length - 1];
-      return s ? { dirX: s.dirX, dirZ: s.dirZ } : { dirX: 0, dirZ: -1 };
+      if (this.segments.length === 0) return { dirX: 0, dirZ: -1 };
+      const first = this.segments[0];
+      const last  = this.segments[this.segments.length - 1];
+      return pathDist < first.startDist
+        ? { dirX: first.dirX, dirZ: first.dirZ }
+        : { dirX: last.dirX, dirZ: last.dirZ };
     }
     return { dirX: seg.dirX, dirZ: seg.dirZ };
   }
