@@ -298,9 +298,8 @@ export class Game {
         this._showMenu();
       });
     } else {
-      this.ui.showLevelComplete(this.levelIndex + 1, this.score.score, () => {
-        this._startLevel(nextIndex);
-      });
+      this.ui.showLevelBanner(this.levelIndex + 1, this.score.score);
+      window.setTimeout(() => this._startLevel(nextIndex), 2600);
     }
   }
 

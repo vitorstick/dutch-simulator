@@ -24,6 +24,8 @@ export class UI {
   private readonly titleEl:   HTMLElement;
   private readonly bodyEl:    HTMLElement;
   private readonly btnEl:     HTMLButtonElement;
+  private readonly bannerEl:  HTMLElement;
+  private bannerTimer: number | null = null;
 
   constructor() {
     const hud = document.getElementById('hud')!;
@@ -56,6 +58,12 @@ export class UI {
     this.titleEl   = document.getElementById('overlay-title')!;
     this.bodyEl    = document.getElementById('overlay-body')!;
     this.btnEl     = document.getElementById('overlay-btn') as HTMLButtonElement;
+
+    this.bannerEl = document.createElement('div');
+    this.bannerEl.id = 'level-banner';
+    this.bannerEl.className = 'hidden';
+    this.bannerEl.innerHTML = '<h2></h2><p></p>';
+    hud.appendChild(this.bannerEl);
   }
 
   /**
@@ -155,18 +163,48 @@ export class UI {
   }
 
   /**
-   * Show the level-complete overlay.
+   * Show a non-blocking level-complete banner that auto-dismisses.
    * @param level   - The level number just completed (1-based, for display).
    * @param score   - Current score to display.
-   * @param onNext  - Callback invoked when the player clicks "NEXT LEVEL".
+   * @param duration - How long (ms) to show the banner before fading out.
    */
-  showLevelComplete(level: number, score: number, onNext: () => void): void {
-    this._show(
-      '✅ PATH CLEARED!',
-      `Level ${level} complete!<br>Score so far: <b>${score}</b>`,
-      'NEXT LEVEL →',
-      onNext,
-    );
+  showLevelBanner(level: number, score: number, duration = 2200): void {
+    if (this.bannerTimer !== null) {
+      window.clearTimeout(this.bannerTimer);
+      this.bannerTimer = null;
+    }
+    const h2 = this.bannerEl.querySelector('h2')!;
+    const p  = this.bannerEl.querySelector('p')!;
+    h2.textContent = '✅ PATH CLEARED!';
+    p.textContent  = `Level ${level} complete — Score: ${score}  ·  Press Space or Enter to continue`;
+    this.bannerEl.classList.remove('hidden', 'fade-out');
+    void (this.bannerEl as HTMLElement).offsetWidth;
+
+    const dismiss = () => {
+      if (this.bannerTimer === null) return; // already dismissed
+      window.clearTimeout(this.bannerTimer);
+      this.bannerTimer = null;
+      window.removeEventListener('keydown', onKey);
+      this.bannerEl.classList.add('fade-out');
+      window.setTimeout(() => this.bannerEl.classList.add('hidden'), 420);
+    };
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === 'Space' || e.code === 'Enter') {
+        e.preventDefault();
+        dismiss();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+
+    this.bannerTimer = window.setTimeout(() => {
+      window.removeEventListener('keydown', onKey);
+      this.bannerEl.classList.add('fade-out');
+      this.bannerTimer = window.setTimeout(() => {
+        this.bannerEl.classList.add('hidden');
+        this.bannerTimer = null;
+      }, 420);
+    }, duration);
   }
 
   /**

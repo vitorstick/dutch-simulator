@@ -172,6 +172,46 @@ body {
   display: none;
 }
 
+/* Non-blocking level-complete banner */
+#level-banner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.78);
+  border: 2px solid rgba(255, 165, 0, 0.6);
+  padding: 18px 36px;
+  border-radius: 14px;
+  color: #fff;
+  text-align: center;
+  pointer-events: none;
+  z-index: 20;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  opacity: 1;
+}
+
+#level-banner h2 {
+  margin: 0 0 6px;
+  font-size: 28px;
+  color: #ffa500;
+  letter-spacing: 2px;
+}
+
+#level-banner p {
+  margin: 0;
+  font-size: 15px;
+  color: #ddd;
+}
+
+#level-banner.fade-out {
+  opacity: 0;
+  transform: translate(-50%, -56%);
+}
+
+#level-banner.hidden {
+  display: none;
+}
+
 /* ── Menu: leaderboard ───────────────────────────────────────────────────── */
 
 .menu-tagline {
