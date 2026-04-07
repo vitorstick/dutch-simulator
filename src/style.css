@@ -302,3 +302,15 @@ body {
   border-color: #ff8800;
   background: rgba(255, 102, 0, 0.12);
 }
+
+#player-name.input-error {
+  border-color: #ff2222;
+  background: rgba(255, 34, 34, 0.15);
+  animation: shake 0.3s ease;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25%       { transform: translateX(-6px); }
+  75%       { transform: translateX(6px); }
+}

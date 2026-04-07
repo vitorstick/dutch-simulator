@@ -131,14 +131,19 @@ export class UI {
       </div>
       <div class="name-entry">
         <label for="player-name">YOUR NAME</label>
-        <input id="player-name" type="text" maxlength="20" placeholder="ANON" autocomplete="off" spellcheck="false">
+        <input id="player-name" type="text" maxlength="20" placeholder="Your name…" autocomplete="off" spellcheck="false" required>
       </div>
     `;
 
     this.btnEl.textContent = 'START RIDING';
     this.btnEl.onclick = () => {
       const input = document.getElementById('player-name') as HTMLInputElement | null;
-      const name  = (input?.value.trim() || 'ANON').slice(0, 20);
+      const name  = input?.value.trim().slice(0, 20) ?? '';
+      if (!name) {
+        input?.classList.add('input-error');
+        input?.focus();
+        return;
+      }
       this.overlayEl.classList.add('hidden');
       onStart(name);
     };
@@ -146,6 +151,7 @@ export class UI {
 
     const nameInput = document.getElementById('player-name') as HTMLInputElement | null;
     if (nameInput) {
+      nameInput.addEventListener('input', () => nameInput.classList.remove('input-error'));
       nameInput.addEventListener('keydown', (e: KeyboardEvent) => {
         if (e.key === 'Enter') this.btnEl.click();
       });
