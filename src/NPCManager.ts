@@ -1,5 +1,6 @@
 ﻿import * as THREE from 'three';
 import { NPC } from './NPC';
+import { TouristNPC } from './TouristNPC';
 import { FatBikeNPC } from './FatBikeNPC';
 import { LevelConfig } from './LevelConfig';
 import { randomBetween, randomSign } from './utils';
@@ -13,8 +14,10 @@ const RECYCLE_AHEAD  = 80;
 
 export class NPCManager {
   private npcs:            NPC[]        = [];
-  private spawnTimer       = 0;
-  private totalSpawned     = 0;
+  private regularTimer    = 0;
+  private regularSpawned  = 0;
+  private touristTimer    = 0;
+  private touristSpawned  = 0;
 
   private fatBikes:          FatBikeNPC[] = [];
   private fatBikeSpawnTimer  = 0;
@@ -32,18 +35,28 @@ export class NPCManager {
 
   allCleared(): boolean {
     return (
-      this.totalSpawned >= this.config.npcCount &&
+      this.regularSpawned >= this.config.npcCount &&
+      this.touristSpawned >= this.config.touristCount &&
       this.npcs.every(npc => !npc.isAlive)
     );
   }
 
   update(delta: number, playerPathDist: number): void {
-    // Spawn pedestrians
-    if (this.totalSpawned < this.config.npcCount) {
-      this.spawnTimer += delta;
-      if (this.spawnTimer >= this.config.spawnInterval) {
-        this.spawnTimer = 0;
+    // Spawn regular pedestrians
+    if (this.regularSpawned < this.config.npcCount) {
+      this.regularTimer += delta;
+      if (this.regularTimer >= this.config.spawnInterval) {
+        this.regularTimer = 0;
         this._spawnOne(playerPathDist);
+      }
+    }
+
+    // Spawn tourists
+    if (this.touristSpawned < this.config.touristCount) {
+      this.touristTimer += delta;
+      if (this.touristTimer >= this.config.spawnInterval) {
+        this.touristTimer = 0;
+        this._spawnTourist(playerPathDist);
       }
     }
 
@@ -101,10 +114,12 @@ export class NPCManager {
   clear(): void {
     for (const npc  of this.npcs)     npc.dispose(this.scene);
     for (const bike of this.fatBikes) bike.dispose(this.scene);
-    this.npcs             = [];
-    this.fatBikes         = [];
-    this.spawnTimer       = 0;
-    this.totalSpawned     = 0;
+    this.npcs              = [];
+    this.fatBikes          = [];
+    this.regularTimer      = 0;
+    this.regularSpawned    = 0;
+    this.touristTimer      = 0;
+    this.touristSpawned    = 0;
     this.fatBikeSpawnTimer = 0;
     this.fatBikesSpawned   = 0;
   }
@@ -115,7 +130,16 @@ export class NPCManager {
     const speed   = randomBetween(this.config.npcSpeedMin, this.config.npcSpeedMax);
     const dir     = randomSign();
     this.npcs.push(new NPC(this.scene, speed, dir, dist, lateral, this.pathSystem));
-    this.totalSpawned++;
+    this.regularSpawned++;
+  }
+
+  private _spawnTourist(playerPathDist: number): void {
+    const lateral = (Math.random() - 0.5) * (CYCLE_PATH_HALF_WIDTH * 2 - 0.6);
+    const dist    = playerPathDist + 8 + Math.random() * 35;
+    const speed   = randomBetween(this.config.npcSpeedMin, this.config.npcSpeedMax);
+    const dir     = randomSign();
+    this.npcs.push(new TouristNPC(this.scene, speed, dir, dist, lateral, this.pathSystem));
+    this.touristSpawned++;
   }
 
   private _spawnFatBike(playerPathDist: number): void {

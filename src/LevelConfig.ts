@@ -1,7 +1,9 @@
 /** Configuration data for a single game level. */
 export interface LevelConfig {
-  /** Total number of pedestrians to spawn before the level can be cleared. */
+  /** Number of regular pedestrians to spawn before the level can be cleared. */
   npcCount: number;
+  /** Number of tourist pedestrians (with trolley) to spawn before the level can be cleared. */
+  touristCount: number;
   /** Minimum walk speed of spawned pedestrians (world units / second). */
   npcSpeedMin: number;
   /** Maximum walk speed of spawned pedestrians (world units / second). */
@@ -25,9 +27,9 @@ export interface LevelConfig {
  * Completing the last entry triggers the victory screen instead of loading a next level.
  */
 export const LEVELS: LevelConfig[] = [
-  { npcCount: 5,  npcSpeedMin: 2,   npcSpeedMax: 3,   spawnInterval: 2.0, timeLimit: 60, fatBikeCount: 0, fatBikeSpeedMin: 8,  fatBikeSpeedMax: 10 },
-  { npcCount: 8,  npcSpeedMin: 2.5, npcSpeedMax: 4,   spawnInterval: 1.5, timeLimit: 55, fatBikeCount: 2, fatBikeSpeedMin: 8,  fatBikeSpeedMax: 11 },
-  { npcCount: 12, npcSpeedMin: 3,   npcSpeedMax: 5,   spawnInterval: 1.2, timeLimit: 50, fatBikeCount: 3, fatBikeSpeedMin: 9,  fatBikeSpeedMax: 12 },
-  { npcCount: 16, npcSpeedMin: 3.5, npcSpeedMax: 6,   spawnInterval: 1.0, timeLimit: 45, fatBikeCount: 4, fatBikeSpeedMin: 10, fatBikeSpeedMax: 13 },
-  { npcCount: 20, npcSpeedMin: 4,   npcSpeedMax: 7.5, spawnInterval: 0.8, timeLimit: 40, fatBikeCount: 5, fatBikeSpeedMin: 11, fatBikeSpeedMax: 14 },
+  { npcCount: 3,  touristCount: 2,  npcSpeedMin: 2,   npcSpeedMax: 3,   spawnInterval: 2.0, timeLimit: 60, fatBikeCount: 0, fatBikeSpeedMin: 8,  fatBikeSpeedMax: 10 },
+  { npcCount: 4,  touristCount: 4,  npcSpeedMin: 2.5, npcSpeedMax: 4,   spawnInterval: 1.5, timeLimit: 55, fatBikeCount: 2, fatBikeSpeedMin: 8,  fatBikeSpeedMax: 11 },
+  { npcCount: 6,  touristCount: 6,  npcSpeedMin: 3,   npcSpeedMax: 5,   spawnInterval: 1.2, timeLimit: 50, fatBikeCount: 3, fatBikeSpeedMin: 9,  fatBikeSpeedMax: 12 },
+  { npcCount: 8,  touristCount: 8,  npcSpeedMin: 3.5, npcSpeedMax: 6,   spawnInterval: 1.0, timeLimit: 45, fatBikeCount: 4, fatBikeSpeedMin: 10, fatBikeSpeedMax: 13 },
+  { npcCount: 10, touristCount: 10, npcSpeedMin: 4,   npcSpeedMax: 7.5, spawnInterval: 0.8, timeLimit: 40, fatBikeCount: 5, fatBikeSpeedMin: 11, fatBikeSpeedMax: 14 },
 ];
