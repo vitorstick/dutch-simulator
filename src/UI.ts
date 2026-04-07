@@ -121,7 +121,7 @@ export class UI {
    * @param onStart  - Callback invoked with the entered name when START is clicked.
    */
   showMenu(entries: LeaderboardEntry[], onStart: (name: string) => void): void {
-    this.titleEl.textContent = '🚲 DUTCH DUCHE SIMULATOR';
+    this.titleEl.textContent = '🚲 DUTCH SIMULATOR';
 
     this.bodyEl.innerHTML = `
       <p class="menu-tagline">Ride your bike and clear the cycle path!<br>Use <b>WASD</b> or <b>Arrow Keys</b> to move.</p>
