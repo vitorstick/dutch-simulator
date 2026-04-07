@@ -293,7 +293,8 @@ export class Game {
 
     const nextIndex = this.levelIndex + 1;
     if (nextIndex >= LEVELS.length) {
-      void saveScore(this.playerName, this.score.score);(this.score.score, () => {
+      void saveScore(this.playerName, this.score.score);
+      this.ui.showVictory(this.score.score, () => {
         this.score.fullReset();
         this._showMenu();
       });

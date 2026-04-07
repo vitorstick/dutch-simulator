@@ -71,6 +71,7 @@ export class PathSystem {
   private totalGenDist = 0;
   private nextX        = 0;
   private nextZ        = 0;
+  private nextSegIndex = 0;
 
   constructor() {
     // Pre-generate enough segments for initial world view
@@ -87,6 +88,7 @@ export class PathSystem {
     this.totalGenDist    = 0;
     this.nextX           = 0;
     this.nextZ           = 0;
+    this.nextSegIndex    = 0;
     for (let i = 0; i < 6; i++) this.generateNext();
   }
 
@@ -169,7 +171,7 @@ export class PathSystem {
    * Exposed so `World` can request segments one at a time when needed.
    */
   generateNext(): Segment {
-    const idx    = this.segments.length;
+    const idx    = this.nextSegIndex++;
     const dIdx   = idx % 4;
     const dirX   = DIR_X[dIdx];
     const dirZ   = DIR_Z[dIdx];
