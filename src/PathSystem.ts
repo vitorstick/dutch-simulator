@@ -45,6 +45,18 @@ export interface Segment {
   dirX:      0 | 1 | -1;
   /** Z component of the unit direction vector (0, +1, or −1). */
   dirZ:      0 | 1 | -1;
+  /** Display name of the street (e.g. "Herengracht"). */
+  name?:        string;
+  /** Optional street environment — drives World.ts rendering. */
+  environment?: string;
+  /** What flanks the cyclist on the left (negative-X) side. */
+  leftSide?:    string;
+  /** What flanks the cyclist on the right (positive-X) side. */
+  rightSide?:   string;
+  /** Name of a notable building/place on this segment. */
+  landmark?:    string;
+  /** Fractional position (0–1) of the landmark along the segment. */
+  landmarkT?:   number;
 }
 
 // ─── Direction table ──────────────────────────────────────────────────────────
@@ -68,14 +80,16 @@ export class PathSystem {
   /** All currently active segments, ordered by increasing startDist. */
   readonly segments: Segment[] = [];
 
-  private totalGenDist = 0;
-  private nextX        = 0;
-  private nextZ        = 0;
-  private nextSegIndex = 0;
+  protected totalGenDist = 0;
+  protected nextX        = 0;
+  protected nextZ        = 0;
+  protected nextSegIndex = 0;
 
-  constructor() {
+  constructor(autoInit = true) {
     // Pre-generate enough segments for initial world view
-    for (let i = 0; i < 6; i++) this.generateNext();
+    if (autoInit) {
+      for (let i = 0; i < 6; i++) this.generateNext();
+    }
   }
 
   /**
@@ -91,6 +105,7 @@ export class PathSystem {
     this.nextSegIndex    = 0;
     for (let i = 0; i < 6; i++) this.generateNext();
   }
+
 
   // ─── Public API ─────────────────────────────────────────────────────────────
 

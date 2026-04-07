@@ -2,7 +2,7 @@ import { createScene, SceneSetup } from './Scene';
 import { IsoCamera }               from './Camera';
 import { World }                   from './World';
 import { Player }                  from './Player';
-import { PathSystem }              from './PathSystem';
+import { AmsterdamPathSystem }     from './AmsterdamPathSystem';
 import { NPCManager }              from './NPCManager';
 import { checkCollisions, checkFatBikeCollisions } from './CollisionSystem';
 import { ScoreManager }            from './ScoreManager';
@@ -84,7 +84,7 @@ export class Game {
   private readonly player:     Player;
   private readonly score:      ScoreManager;
   private readonly ui:         UI;
-  private readonly pathSystem: PathSystem;
+  private readonly pathSystem: AmsterdamPathSystem;
   private readonly world:      World;
 
   private npcManager: NPCManager | null = null;
@@ -101,7 +101,7 @@ export class Game {
   constructor() {
     this.setup      = createScene();
     this.camera     = new IsoCamera();
-    this.pathSystem = new PathSystem();
+    this.pathSystem = new AmsterdamPathSystem();
     this.world      = new World(this.setup.scene);
     this.player     = new Player(this.setup.scene, this.pathSystem);
     this.score      = new ScoreManager();
@@ -259,8 +259,7 @@ export class Game {
       if (this.score.isGameOver) {
         this._onGameOver();
       } else {
-        // Time ran out — restart same level (lose a life), reset to path start
-        this._hardReset();
+        // Time ran out — lose a life but keep position; just refresh NPCs
         this._startLevel(this.levelIndex);
       }
       return;

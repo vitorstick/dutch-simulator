@@ -66,6 +66,10 @@ export class World {
     const L    = seg.length;
     const midZ = -(L / 2);
 
+    const env   = seg.environment ?? 'canal_street';
+    const left  = seg.leftSide    ?? 'canal';
+    const right = seg.rightSide   ?? 'canal';
+
     const addPlane = (w: number, h: number, color: number, x: number, y: number, z: number): THREE.Mesh => {
       const geo  = new THREE.PlaneGeometry(w, h);
       const mat  = new THREE.MeshLambertMaterial({ color });
@@ -77,17 +81,26 @@ export class World {
       return mesh;
     };
 
-    addPlane(60, L, 0x4a6741, 0, -0.02, midZ);
-    addPlane(8,  L, 0x282828, 7,  0,    midZ);
+    // Base plane — colour varies by environment
+    const baseColor = env === 'plaza'  ? 0xc8b89a
+                    : env === 'bridge' ? 0x777777
+                    : 0x4a6741;
+    addPlane(60, L, baseColor, 0, -0.02, midZ);
 
-    for (let d = 4; d < L; d += 8) {
-      addPlane(0.15, 3, 0xeeeecc, 7, 0.01, -d);
+    // Road (omitted for open plazas)
+    if (env !== 'plaza') {
+      addPlane(8, L, 0x282828, 7, 0, midZ);
+      for (let d = 4; d < L; d += 8) {
+        addPlane(0.15, 3, 0xeeeecc, 7, 0.01, -d);
+      }
     }
 
+    // Footpaths always present
     addPlane(3, L, 0xb89c7a, -3.5, 0.005, midZ);
     addPlane(3, L, 0xb89c7a,  3.5, 0.005, midZ);
-    addPlane(CYCLE_PATH_HALF_WIDTH * 2, L, 0xcc2200, 0, 0.01, midZ);
 
+    // Bike lane always present
+    addPlane(CYCLE_PATH_HALF_WIDTH * 2, L, 0xcc2200, 0, 0.01, midZ);
     for (let d = 3; d < L; d += 7) {
       addPlane(0.12, 2, 0xffffff, 0, 0.02, -d);
     }
@@ -96,26 +109,74 @@ export class World {
     if (iLen > 4) {
       const iMid = -(MARGIN + iLen / 2);
 
-      this._addCanalInGroup(group, -10, iLen, iMid);
-      this._addCanalInGroup(group,  14, iLen, iMid);
-      this._addBuildingRow(group, -13, iLen, iMid);
-      this._addBuildingRow(group,  17, iLen, iMid);
+      if (env === 'bridge') {
+        // Wide water body under the bridge
+        const waterGeo = new THREE.PlaneGeometry(50, iLen);
+        const waterMat = new THREE.MeshPhongMaterial({ color: 0x1a6688, shininess: 70, specular: 0x66bbdd });
+        const water    = new THREE.Mesh(waterGeo, waterMat);
+        water.rotation.x = -Math.PI / 2;
+        water.position.set(0, -0.05, iMid);
+        group.add(water);
+        this._addGuardRail(group, -5,   iLen, iMid);
+        this._addGuardRail(group,  12,  iLen, iMid);
+      } else {
+        // Left side
+        if (left === 'canal') {
+          this._addCanalInGroup(group, -10, iLen, iMid);
+          this._addBuildingRow(group,  -13, iLen, iMid);
+        } else if (left === 'building') {
+          this._addBuildingRow(group, -9, iLen, iMid);
+        } else if (left === 'park') {
+          addPlane(8, iLen, 0x3a7a31, -8, 0, iMid);
+        }
+        // 'open' / 'plaza': base plane is sufficient
 
-      for (let d = MARGIN + 6; d < L - MARGIN; d += 14) {
-        this._addLamppost(group, -4.8, -d);
-        this._addLamppost(group,  4.8, -d);
+        // Right side
+        if (right === 'canal') {
+          this._addCanalInGroup(group, 14, iLen, iMid);
+          this._addBuildingRow(group,  17, iLen, iMid);
+        } else if (right === 'building') {
+          this._addBuildingRow(group, 13, iLen, iMid);
+        } else if (right === 'park') {
+          addPlane(8, iLen, 0x3a7a31, 11, 0, iMid);
+        }
+
+        // Lampposts (skip inside alleys — they're too narrow)
+        if (env !== 'alley') {
+          for (let d = MARGIN + 6; d < L - MARGIN; d += 14) {
+            this._addLamppost(group, -4.8, -d);
+            this._addLamppost(group,  4.8, -d);
+          }
+        }
+
+        // Bollards
+        for (let d = MARGIN + 2; d < L - MARGIN; d += 5) {
+          this._addBollard(group, -2.4, -d);
+          this._addBollard(group,  2.4, -d);
+        }
+
+        // Tulips (not on formal/paved surfaces)
+        if (env !== 'plaza') {
+          this._addTulips(group, iLen, iMid);
+        }
       }
-      for (let d = MARGIN + 2; d < L - MARGIN; d += 5) {
-        this._addBollard(group, -2.4, -d);
-        this._addBollard(group,  2.4, -d);
+
+      // Landmark marker
+      if (seg.landmark !== undefined && seg.landmarkT !== undefined) {
+        this._addLandmarkMarker(group, -(seg.length * seg.landmarkT));
       }
-      this._addTulips(group, iLen, iMid);
+    }
+
+    // Street name labels at the entry and exit of the segment
+    if (seg.name && L > 20) {
+      this._addStreetLabel(group, seg.name, -6);
+      this._addStreetLabel(group, seg.name, -(L - 6));
     }
 
     return group;
   }
 
-  private _buildCorner(seg: Segment, next: Segment): THREE.Group {
+  private _buildCorner(seg: Segment, _next: Segment): THREE.Group {
     const group = new THREE.Group();
     const cx    = seg.endX;
     const cz    = seg.endZ;
@@ -130,21 +191,17 @@ export class World {
       group.add(mesh);
     };
 
-    addPlane(50, 50, 0x4a6741, cx, -0.02, cz);
+    // Grass base — covers the full gap between two perpendicular 60-wide segments
+    addPlane(62, 62, 0x4a6741, cx, -0.02, cz);
 
-    const iRX = -seg.dirZ  as number;
-    const iRZ =  seg.dirX  as number;
-    const oRX = -next.dirZ as number;
-    const oRZ =  next.dirX as number;
+    // Footpath ring — shows as a sandy border around the road pad
+    addPlane(22, 22, 0xb89c7a, cx, 0.0, cz);
 
-    const swX = cx + 3.5 * (iRX + oRX) * 0.5;
-    const swZ = cz + 3.5 * (iRZ + oRZ) * 0.5;
-    addPlane(7, 7, 0xb89c7a, swX, 0.005, swZ);
+    // Road surface — centered, 18×18 covers a ±9 radius; road offset in segments is ±7
+    // so this pad always meets both approaching road surfaces regardless of turn direction
+    addPlane(18, 18, 0x282828, cx, 0.005, cz);
 
-    const rAx = cx + 7 * iRX;  const rAz = cz + 7 * iRZ;
-    const rBx = cx + 7 * oRX;  const rBz = cz + 7 * oRZ;
-    addPlane(12, 12, 0x282828, (rAx + rBx) / 2, 0, (rAz + rBz) / 2);
-
+    // Bike-path crossing square at the very centre
     addPlane(CYCLE_PATH_HALF_WIDTH * 2 + 2, CYCLE_PATH_HALF_WIDTH * 2 + 2, 0xcc2200, cx, 0.01, cz);
 
     return group;
@@ -242,5 +299,60 @@ export class World {
       head.position.set(x, 0.82, z);
       group.add(head);
     }
+  }
+
+  /** Metal guard-rail (for bridges): a horizontal bar + evenly-spaced posts. */
+  private _addGuardRail(group: THREE.Group, x: number, len: number, zCenter: number): void {
+    const mat    = new THREE.MeshLambertMaterial({ color: 0x888888 });
+    const barGeo = new THREE.BoxGeometry(0.08, 0.06, len);
+    const bar    = new THREE.Mesh(barGeo, mat);
+    bar.position.set(x, 0.9, zCenter);
+    group.add(bar);
+
+    for (let d = 1; d < len; d += 3) {
+      const postGeo = new THREE.BoxGeometry(0.08, 0.9, 0.08);
+      const post    = new THREE.Mesh(postGeo, mat);
+      post.position.set(x, 0.45, zCenter + len / 2 - d);
+      group.add(post);
+    }
+  }
+
+  /** Flat road-marking label with the street name, placed at local Z position `z`. */
+  private _addStreetLabel(group: THREE.Group, text: string, z: number): void {
+    const canvas  = document.createElement('canvas');
+    canvas.width  = 512;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, 512, 64);
+    ctx.font         = 'bold 28px Arial, sans-serif';
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.strokeStyle  = '#000000';
+    ctx.lineWidth    = 5;
+    ctx.strokeText(text, 256, 34);
+    ctx.fillStyle    = '#ffffff';
+    ctx.fillText(text, 256, 34);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const geo     = new THREE.PlaneGeometry(10, 1.25);
+    const mat     = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
+    const mesh    = new THREE.Mesh(geo, mat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(0, 0.04, z);
+    group.add(mesh);
+  }
+
+  /** Gold spire marking a landmark at local Z position `z`. */
+  private _addLandmarkMarker(group: THREE.Group, z: number): void {
+    const mat     = new THREE.MeshLambertMaterial({ color: 0xffd700, emissive: 0x443300 });
+    const poleGeo = new THREE.CylinderGeometry(0.06, 0.09, 7, 6);
+    const pole    = new THREE.Mesh(poleGeo, mat);
+    pole.position.set(9, 3.5, z);
+    group.add(pole);
+
+    const capGeo = new THREE.SphereGeometry(0.22, 8, 6);
+    const cap    = new THREE.Mesh(capGeo, mat);
+    cap.position.set(9, 7.1, z);
+    group.add(cap);
   }
 }
