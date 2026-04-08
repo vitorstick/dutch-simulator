@@ -6,8 +6,8 @@ import { type LeaderboardEntry } from './Leaderboard';
  * Two layers:
  * - **HUD** (`#hud-top`): always-visible bar showing score, level, timer, and
  *   lives. Updated every frame via `update()`.
- * - **Overlays** (`#overlay`): full-screen panels for MENU, LEVEL_COMPLETE,
- *   VICTORY, and GAME_OVER states. Shown/hidden via CSS class `"hidden"`.
+ * - **Overlays** (`#overlay`): full-screen panels for MENU, VICTORY, and
+ *   GAME_OVER states. Shown/hidden via CSS class `"hidden"`.
  *
  * The UI deliberately uses plain DOM instead of Three.js objects so that it
  * renders at native resolution and benefits from CSS transitions.
@@ -169,42 +169,24 @@ export class UI {
   }
 
   /**
-   * Show a non-blocking level-complete banner that auto-dismisses.
+   * Show a small, non-blocking level-complete toast near the HUD.
    * @param level   - The level number just completed (1-based, for display).
    * @param score   - Current score to display.
    * @param duration - How long (ms) to show the banner before fading out.
    */
-  showLevelBanner(level: number, score: number, duration = 2200): void {
+  showLevelBanner(level: number, score: number, duration = 1400): void {
     if (this.bannerTimer !== null) {
       window.clearTimeout(this.bannerTimer);
       this.bannerTimer = null;
     }
     const h2 = this.bannerEl.querySelector('h2')!;
     const p  = this.bannerEl.querySelector('p')!;
-    h2.textContent = '✅ PATH CLEARED!';
-    p.textContent  = `Level ${level} complete — Score: ${score}  ·  Press Space or Enter to continue`;
+    h2.textContent = 'PATH CLEARED';
+    p.textContent  = `Level ${level} complete · Score: ${score}`;
     this.bannerEl.classList.remove('hidden', 'fade-out');
     void (this.bannerEl as HTMLElement).offsetWidth;
 
-    const dismiss = () => {
-      if (this.bannerTimer === null) return; // already dismissed
-      window.clearTimeout(this.bannerTimer);
-      this.bannerTimer = null;
-      window.removeEventListener('keydown', onKey);
-      this.bannerEl.classList.add('fade-out');
-      window.setTimeout(() => this.bannerEl.classList.add('hidden'), 420);
-    };
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.code === 'Space' || e.code === 'Enter') {
-        e.preventDefault();
-        dismiss();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-
     this.bannerTimer = window.setTimeout(() => {
-      window.removeEventListener('keydown', onKey);
       this.bannerEl.classList.add('fade-out');
       this.bannerTimer = window.setTimeout(() => {
         this.bannerEl.classList.add('hidden');

@@ -97,4 +97,19 @@ describe('Game._update logic (unit tests with mocks)', () => {
     expect(mockScore.loseLife).toHaveBeenCalled()
     expect(game._startLevel).toHaveBeenCalledWith(game.levelIndex)
   })
+
+  it('level completion shows a banner and immediately starts the next level', () => {
+    ;(checkCollisions as any).mockReturnValue([])
+    ;(checkFatBikeCollisions as any).mockReturnValue([])
+    mockNpcManager.allCleared = vi.fn().mockReturnValue(true)
+    game.ui = { update: vi.fn(), showLevelBanner: vi.fn(), showVictory: vi.fn() }
+    game._startLevel = vi.fn()
+
+    ;(Game.prototype as any)._update.call(game, 0.016, 42)
+
+    expect(game.ui.update).toHaveBeenCalledWith(0, 3, 1, 0, 1)
+    expect(game.ui.showLevelBanner).toHaveBeenCalledWith(1, 0)
+    expect(game._startLevel).toHaveBeenCalledWith(1)
+    expect(game.state).toBe('PLAYING')
+  })
 })

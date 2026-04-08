@@ -53,7 +53,7 @@ function playBell(): void {
 
 // ─── Game state ───────────────────────────────────────────────────────────────
 
-type GameState = 'MENU' | 'PLAYING' | 'LEVEL_COMPLETE' | 'GAME_OVER';
+type GameState = 'MENU' | 'PLAYING' | 'GAME_OVER';
 
 // ─── Game class ───────────────────────────────────────────────────────────────
 
@@ -64,9 +64,9 @@ type GameState = 'MENU' | 'PLAYING' | 'LEVEL_COMPLETE' | 'GAME_OVER';
  * Implements a simple state machine:
  *
  * ```
- * MENU → PLAYING → LEVEL_COMPLETE → PLAYING (next level)
- *                 → GAME_OVER      (0 lives)
- *                 → GAME_OVER      (last level cleared → victory)
+ * MENU → PLAYING → PLAYING (next level)
+ *       → GAME_OVER (0 lives)
+ *       → GAME_OVER (last level cleared → victory)
  * ```
  *
  * Subsystems owned:
@@ -281,12 +281,10 @@ export class Game {
 
   /**
    * Called when all NPCs in the current level have been cleared.
-   * Transitions to `LEVEL_COMPLETE`, then either loads the next level or
-   * shows the victory screen if the last level was completed.
+   * Shows a brief non-blocking banner, then immediately advances to the next
+   * level or shows the victory screen if the last level was completed.
    */
   private _onLevelComplete(): void {
-    this.state = 'LEVEL_COMPLETE';
-
     // Update HUD one final time with 0 timer
     this.ui.update(this.score.score, this.score.lives, 1, 0, this.levelIndex + 1);
 
@@ -299,7 +297,7 @@ export class Game {
       });
     } else {
       this.ui.showLevelBanner(this.levelIndex + 1, this.score.score);
-      window.setTimeout(() => this._startLevel(nextIndex), 2600);
+      this._startLevel(nextIndex);
     }
   }
 

@@ -172,40 +172,44 @@ body {
   display: none;
 }
 
-/* Non-blocking level-complete banner */
+/* Non-blocking level-complete toast */
 #level-banner {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(0, 0, 0, 0.78);
-  border: 2px solid rgba(255, 165, 0, 0.6);
-  padding: 18px 36px;
-  border-radius: 14px;
+  top: 72px;
+  right: 16px;
+  background: rgba(0, 0, 0, 0.62);
+  border: 1px solid rgba(255, 165, 0, 0.38);
+  padding: 10px 14px;
+  border-radius: 10px;
   color: #fff;
-  text-align: center;
+  text-align: left;
   pointer-events: none;
   z-index: 20;
-  transition: opacity 0.4s ease, transform 0.4s ease;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(4px);
+  max-width: min(280px, calc(100vw - 32px));
+  transition: opacity 0.35s ease, transform 0.35s ease;
   opacity: 1;
 }
 
 #level-banner h2 {
-  margin: 0 0 6px;
-  font-size: 28px;
+  margin: 0 0 2px;
+  font-size: 14px;
   color: #ffa500;
-  letter-spacing: 2px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
 }
 
 #level-banner p {
   margin: 0;
-  font-size: 15px;
+  font-size: 12px;
   color: #ddd;
+  line-height: 1.4;
 }
 
 #level-banner.fade-out {
   opacity: 0;
-  transform: translate(-50%, -56%);
+  transform: translateY(-6px);
 }
 
 #level-banner.hidden {
