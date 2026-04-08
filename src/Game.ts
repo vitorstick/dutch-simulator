@@ -267,6 +267,28 @@ export class Game {
 
     // ── Camera & HUD ────────────────────────────────────────────────────────
     const pathDir = this.pathSystem.dirAt(this.player.pathDistance);
+    const minimapMarkers = this.npcManager
+      ? [
+          ...this.npcManager.getLiveNPCs().map((npc) => ({
+            x: npc.position.x,
+            z: npc.position.z,
+            kind: 'npc' as const,
+          })),
+          ...this.npcManager.getLiveFatBikes().map((bike) => ({
+            x: bike.position.x,
+            z: bike.position.z,
+            kind: 'fatbike' as const,
+          })),
+        ]
+      : [];
+
+    this.ui.updateMinimap?.(
+      this.player.position.x,
+      this.player.position.z,
+      pathDir.dirX,
+      pathDir.dirZ,
+      minimapMarkers,
+    );
     this.camera.update(delta, this.player.position, pathDir);
     this.ui.update(
       this.score.score,

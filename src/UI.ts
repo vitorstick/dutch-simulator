@@ -1,4 +1,20 @@
+import { AMSTERDAM_ROUTE } from './AmsterdamMap';
 import { type LeaderboardEntry } from './Leaderboard';
+
+type MiniMapMarker = {
+  x: number;
+  z: number;
+  kind: 'npc' | 'fatbike';
+};
+
+type MiniMapBounds = {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+};
+
+const MINIMAP_SIZE = 170;
 
 /**
  * Manages all DOM-based UI elements overlaid on top of the Three.js canvas.
@@ -26,6 +42,10 @@ export class UI {
   private readonly btnEl:     HTMLButtonElement;
   private readonly bannerEl:  HTMLElement;
   private bannerTimer: number | null = null;
+  private readonly minimapEl:  HTMLElement;
+  private readonly minimapCanvas: HTMLCanvasElement;
+  private readonly minimapCtx: CanvasRenderingContext2D;
+  private readonly minimapBounds: MiniMapBounds;
 
   constructor() {
     const hud = document.getElementById('hud')!;
@@ -64,6 +84,20 @@ export class UI {
     this.bannerEl.className = 'hidden';
     this.bannerEl.innerHTML = '<h2></h2><p></p>';
     hud.appendChild(this.bannerEl);
+
+    this.minimapBounds = this._buildMinimapBounds();
+    this.minimapEl = document.createElement('div');
+    this.minimapEl.id = 'minimap';
+    this.minimapEl.innerHTML = `
+      <div id="minimap-label">MAP</div>
+      <canvas id="minimap-canvas" width="${MINIMAP_SIZE}" height="${MINIMAP_SIZE}"></canvas>
+    `;
+    hud.appendChild(this.minimapEl);
+    this.minimapCanvas = this.minimapEl.querySelector('canvas') as HTMLCanvasElement;
+    const ctx = this.minimapCanvas.getContext('2d');
+    if (!ctx) throw new Error('Unable to initialise minimap canvas');
+    this.minimapCtx = ctx;
+    this._drawMinimapBase();
   }
 
   /**
@@ -92,6 +126,53 @@ export class UI {
       this.comboEl.textContent = '';
       this.comboEl.classList.remove('pop');
     }
+  }
+
+  /** Update the minimap with the player's current position and live threats. */
+  updateMinimap(
+    playerX: number,
+    playerZ: number,
+    headingX: number,
+    headingZ: number,
+    markers: MiniMapMarker[] = [],
+  ): void {
+    const ctx = this.minimapCtx;
+    const size = this.minimapCanvas.width;
+    ctx.clearRect(0, 0, size, size);
+
+    this._drawMinimapBase();
+
+    const player = this._toMiniMapPos(playerX, playerZ);
+    const angle = Math.atan2(headingZ, headingX) + Math.PI / 2;
+
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    ctx.rotate(angle);
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#ff6600';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, -7);
+    ctx.lineTo(5, 6);
+    ctx.lineTo(0, 3);
+    ctx.lineTo(-5, 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    for (const marker of markers) {
+      const pos = this._toMiniMapPos(marker.x, marker.z);
+      ctx.beginPath();
+      ctx.fillStyle = marker.kind === 'fatbike' ? '#ff3355' : '#66ccff';
+      ctx.arc(pos.x, pos.y, marker.kind === 'fatbike' ? 3.6 : 2.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.beginPath();
+    ctx.fillStyle = '#ffffff';
+    ctx.arc(player.x, player.y, 3.2, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   /** Show a brief on-screen hint near the HUD (auto-hides). */
@@ -238,6 +319,90 @@ export class UI {
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  private _buildMinimapBounds(): MiniMapBounds {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+
+    for (const segment of AMSTERDAM_ROUTE) {
+      minX = Math.min(minX, segment.startX, segment.endX);
+      maxX = Math.max(maxX, segment.startX, segment.endX);
+      minZ = Math.min(minZ, segment.startZ, segment.endZ);
+      maxZ = Math.max(maxZ, segment.startZ, segment.endZ);
+    }
+
+    return { minX, maxX, minZ, maxZ };
+  }
+
+  private _toMiniMapPos(x: number, z: number): { x: number; y: number } {
+    const padding = 10;
+    const bounds = this.minimapBounds;
+    const width = this.minimapCanvas.width - padding * 2;
+    const height = this.minimapCanvas.height - padding * 2;
+    const rangeX = Math.max(bounds.maxX - bounds.minX, 1);
+    const rangeZ = Math.max(bounds.maxZ - bounds.minZ, 1);
+    const scale = Math.min(width / rangeX, height / rangeZ);
+    const drawW = rangeX * scale;
+    const drawH = rangeZ * scale;
+    const offsetX = padding + (width - drawW) / 2;
+    const offsetY = padding + (height - drawH) / 2;
+
+    return {
+      x: offsetX + (x - bounds.minX) * scale,
+      y: offsetY + (z - bounds.minZ) * scale,
+    };
+  }
+
+  private _drawMinimapBase(): void {
+    const ctx = this.minimapCtx;
+    const size = this.minimapCanvas.width;
+    const padding = 10;
+    const bounds = this.minimapBounds;
+    const width = size - padding * 2;
+    const height = size - padding * 2;
+    const rangeX = Math.max(bounds.maxX - bounds.minX, 1);
+    const rangeZ = Math.max(bounds.maxZ - bounds.minZ, 1);
+    const scale = Math.min(width / rangeX, height / rangeZ);
+    const drawW = rangeX * scale;
+    const drawH = rangeZ * scale;
+    const offsetX = padding + (width - drawW) / 2;
+    const offsetY = padding + (height - drawH) / 2;
+
+    ctx.fillStyle = 'rgba(5, 8, 12, 0.9)';
+    ctx.fillRect(0, 0, size, size);
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 102, 0, 0.75)';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    for (const segment of AMSTERDAM_ROUTE) {
+      const start = {
+        x: offsetX + (segment.startX - bounds.minX) * scale,
+        y: offsetY + (segment.startZ - bounds.minZ) * scale,
+      };
+      const end = {
+        x: offsetX + (segment.endX - bounds.minX) * scale,
+        y: offsetY + (segment.endZ - bounds.minZ) * scale,
+      };
+      ctx.beginPath();
+      ctx.moveTo(start.x, start.y);
+      ctx.lineTo(end.x, end.y);
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(offsetX, offsetY, drawW, drawH);
+    ctx.restore();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 10px Segoe UI, Arial, sans-serif';
+    ctx.fillText('N', size - 15, 12);
   }
 
   /**
