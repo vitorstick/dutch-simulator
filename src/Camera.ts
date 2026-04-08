@@ -17,7 +17,7 @@ export class IsoCamera {
   private ortho: THREE.OrthographicCamera;
   private third: THREE.PerspectiveCamera;
 
-  private mode: 'iso' | 'third' = 'iso';
+  private mode: 'iso' | 'third' = 'third';
 
   private shakeTimer    = 0;
   private shakeStrength = 0;
@@ -38,10 +38,10 @@ export class IsoCamera {
     this.ortho.lookAt(0, 0, 0);
 
     this.third = new THREE.PerspectiveCamera(55, aspect, 0.1, 500);
-    this.third.position.set(0, 2.4, 4);
+    this.third.position.set(0, 2.4, 5.6);
     this.third.lookAt(0, 1, 0);
 
-    this.camera = this.ortho;
+    this.camera = this.third;
   }
 
   /**
@@ -78,7 +78,7 @@ export class IsoCamera {
       // Third-person: place camera behind the player along the path direction
       const back = new THREE.Vector3(-pathDir.dirX, 0, -pathDir.dirZ).normalize();
       const thirdPos = new THREE.Vector3().copy(target)
-        .addScaledVector(back, 4.0) // distance behind player
+        .addScaledVector(back, 5.6) // distance behind player
         .add(new THREE.Vector3(0, 2.2, 0)); // slight height above player
 
       // Smoothly interpolate the third-person camera towards the target
