@@ -65,8 +65,8 @@ type GameState = 'MENU' | 'PLAYING' | 'GAME_OVER';
  *
  * ```
  * MENU → PLAYING → PLAYING (next level)
+ *                 → PLAYING (level 5 repeats forever)
  *       → GAME_OVER (0 lives)
- *       → GAME_OVER (last level cleared → victory)
  * ```
  *
  * Subsystems owned:
@@ -304,23 +304,16 @@ export class Game {
   /**
    * Called when all NPCs in the current level have been cleared.
    * Shows a brief non-blocking banner, then immediately advances to the next
-   * level or shows the victory screen if the last level was completed.
+   * level. The final level repeats forever instead of ending the game.
    */
   private _onLevelComplete(): void {
     // Update HUD one final time with 0 timer
     this.ui.update(this.score.score, this.score.lives, 1, 0, this.levelIndex + 1);
 
     const nextIndex = this.levelIndex + 1;
-    if (nextIndex >= LEVELS.length) {
-      void saveScore(this.playerName, this.score.score);
-      this.ui.showVictory(this.score.score, () => {
-        this.score.fullReset();
-        this._showMenu();
-      });
-    } else {
-      this.ui.showLevelBanner(this.levelIndex + 1, this.score.score);
-      this._startLevel(nextIndex);
-    }
+    const repeatIndex = Math.min(nextIndex, LEVELS.length - 1);
+    this.ui.showLevelBanner(this.levelIndex + 1, this.score.score);
+    this._startLevel(repeatIndex);
   }
 
   /**

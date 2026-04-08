@@ -112,4 +112,19 @@ describe('Game._update logic (unit tests with mocks)', () => {
     expect(game._startLevel).toHaveBeenCalledWith(1)
     expect(game.state).toBe('PLAYING')
   })
+
+  it('final level completion loops back to the final level instead of ending', () => {
+    ;(checkCollisions as any).mockReturnValue([])
+    ;(checkFatBikeCollisions as any).mockReturnValue([])
+    mockNpcManager.allCleared = vi.fn().mockReturnValue(true)
+    game.ui = { update: vi.fn(), showLevelBanner: vi.fn(), showVictory: vi.fn() }
+    game._startLevel = vi.fn()
+    game.levelIndex = 4
+
+    ;(Game.prototype as any)._update.call(game, 0.016, 42)
+
+    expect(game.ui.showLevelBanner).toHaveBeenCalledWith(5, 0)
+    expect(game._startLevel).toHaveBeenCalledWith(4)
+    expect(game.ui.showVictory).not.toHaveBeenCalled()
+  })
 })
