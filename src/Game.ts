@@ -92,6 +92,7 @@ export class Game {
   private levelIndex  = 0;
   private timeLeft    = 0;
   private lastTime    = 0;
+  private isGodMode   = false;
 
   /**
    * Initialise all subsystems, register global event listeners, start the
@@ -114,6 +115,13 @@ export class Game {
         const mode = this.camera.toggleMode();
         const label = mode === 'third' ? 'Third-Person View' : 'Isometric View';
         this.ui.showHint(`View: ${label}`);
+      }
+
+      if (e.code === 'KeyG') {
+        this.isGodMode = !this.isGodMode;
+        const status = this.isGodMode ? 'ON' : 'OFF';
+        this.ui.showHint(`GOD MODE: ${status}`);
+        playBell(); // subtle audio feedback
       }
     });
 
@@ -251,12 +259,15 @@ export class Game {
       const fatBikeHits = checkFatBikeCollisions(this.player, this.npcManager);
       for (const bike of fatBikeHits) {
         bike.onHitPlayer();
-        this.score.loseLife();
         this.player.hitByFatBike();
         this.camera.shake(1.4);
-        if (this.score.isGameOver) {
-          this._onGameOver();
-          return;
+
+        if (!this.isGodMode) {
+          this.score.loseLife();
+          if (this.score.isGameOver) {
+            this._onGameOver();
+            return;
+          }
         }
       }
 
@@ -271,14 +282,17 @@ export class Game {
     this.timeLeft -= delta;
     if (this.timeLeft <= 0) {
       this.timeLeft = 0;
-      this.score.loseLife();
-      if (this.score.isGameOver) {
-        this._onGameOver();
-      } else {
-        // Time ran out — lose a life but keep position; just refresh NPCs
-        this._startLevel(this.levelIndex);
+      
+      if (!this.isGodMode) {
+        this.score.loseLife();
+        if (this.score.isGameOver) {
+          this._onGameOver();
+        } else {
+          // Time ran out — lose a life but keep position; just refresh NPCs
+          this._startLevel(this.levelIndex);
+        }
+        return;
       }
-      return;
     }
 
     // ── Camera & HUD ────────────────────────────────────────────────────────
