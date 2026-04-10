@@ -85,6 +85,11 @@ export class PathSystem {
   protected nextZ        = 0;
   protected nextSegIndex = 0;
 
+  /** Bifurcation state: when true, generation pauses until a choice is made. */
+  pendingBifurcation: boolean = false;
+  /** Accumulated branch offset applied to subsequent segment directions. */
+  branchDirOffset: number = 0;
+
   constructor(autoInit = true) {
     // Pre-generate enough segments for initial world view
     if (autoInit) {
@@ -103,6 +108,8 @@ export class PathSystem {
     this.nextX           = 0;
     this.nextZ           = 0;
     this.nextSegIndex    = 0;
+    this.pendingBifurcation = false;
+    this.branchDirOffset = 0;
     for (let i = 0; i < 6; i++) this.generateNext();
   }
 
@@ -167,7 +174,7 @@ export class PathSystem {
    * the player.  Call once per frame from `Game`.
    */
   ensureAhead(playerDist: number, lookahead = 150): void {
-    while (this.totalGenDist < playerDist + lookahead) {
+    while (this.totalGenDist < playerDist + lookahead && !this.pendingBifurcation) {
       this.generateNext();
     }
   }
@@ -201,7 +208,8 @@ export class PathSystem {
    */
   generateNext(): Segment {
     const idx    = this.nextSegIndex++;
-    const dIdx   = idx % 4;
+    // Apply any branch offset; preserve sign and normalise into 0..3
+    const dIdx   = ((idx + this.branchDirOffset) % 4 + 4) % 4;
     const dirX   = DIR_X[dIdx];
     const dirZ   = DIR_Z[dIdx];
     // Spiral: pairs of segments grow longer to prevent self-intersection
@@ -225,5 +233,20 @@ export class PathSystem {
     this.nextX        = seg.endX;
     this.nextZ        = seg.endZ;
     return seg;
+  }
+
+  /**
+   * Accept a player choice at a bifurcation point.
+   * If no bifurcation is pending this is ignored.
+   */
+  makeChoice(turn: 'left' | 'right' | 'forward'): void {
+    if (!this.pendingBifurcation) return;
+    this.pendingBifurcation = false;
+    let delta = 0;
+    if (turn === 'right') delta = 1;
+    if (turn === 'left')  delta = -1;
+    this.branchDirOffset += delta;
+    // Generate a small buffer of segments after the choice so gameplay can continue.
+    for (let i = 0; i < 6; i++) this.generateNext();
   }
 }
