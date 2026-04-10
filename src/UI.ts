@@ -1,4 +1,5 @@
 import { AMSTERDAM_ROUTE } from './AmsterdamMap';
+import type { JunctionOption } from './AmsterdamMap';
 import { type LeaderboardEntry } from './Leaderboard';
 
 type MiniMapMarker = {
@@ -46,6 +47,8 @@ export class UI {
   private readonly minimapCanvas: HTMLCanvasElement;
   private readonly minimapCtx: CanvasRenderingContext2D;
   private readonly minimapBounds: MiniMapBounds;
+  private junctionEl: HTMLElement | null = null;
+  private _junctionVisible = false;
 
   constructor() {
     const hud = document.getElementById('hud')!;
@@ -98,6 +101,12 @@ export class UI {
     if (!ctx) throw new Error('Unable to initialise minimap canvas');
     this.minimapCtx = ctx;
     this._drawMinimapBase();
+
+    // Junction direction chooser (shown when approaching a route fork)
+    this.junctionEl = document.createElement('div');
+    this.junctionEl.id = 'junction-hud';
+    this.junctionEl.className = 'hidden';
+    hud.appendChild(this.junctionEl);
   }
 
   /**
@@ -205,7 +214,7 @@ export class UI {
     this.titleEl.textContent = '🚲 DUTCH SIMULATOR';
 
     this.bodyEl.innerHTML = `
-      <p class="menu-tagline">Ride your bike and clear the cycle path!<br>Use <b>WASD</b> or <b>Arrow Keys</b> to move.</p>
+      <p class="menu-tagline">Ride your bike and clear the cycle path!<br>Use <b>WASD</b> or <b>Arrow Keys</b> to move.<br>At junctions: <b>Q</b> = turn left &nbsp;·&nbsp; <b>E</b> = turn right &nbsp;·&nbsp; auto = straight</p>
       <div class="leaderboard">
         <h3>🏆 TOP SCORES</h3>
         <table id="lb-table">${this._buildRows(entries, true)}</table>
@@ -308,6 +317,40 @@ export class UI {
   /** Hides the overlay panel without triggering any callback. */
   hideOverlay(): void {
     this.overlayEl.classList.add('hidden');
+  }
+
+  /**
+   * Show the route-fork direction chooser near the bottom of the screen.
+   *
+   * Called every frame while the player is within `JUNCTION_WARN_DIST` of a
+   * multi-option junction. No-ops if already visible with the same options.
+   *
+   * @param options - The pending junction options from `AmsterdamPathSystem`.
+   */
+  showJunctionHUD(options: JunctionOption[]): void {
+    if (!this.junctionEl) return;
+    if (this._junctionVisible) return;  // avoid flickering — built once per approach
+    let html = '<div class="junction-title">CHOOSE YOUR ROUTE</div><div class="junction-opts">';
+    for (const opt of options) {
+      const arrow = opt.direction === 'left' ? '←' : opt.direction === 'right' ? '→' : '↑';
+      const key   = opt.direction === 'left' ? 'Q' : opt.direction === 'right' ? 'E' : '—';
+      html += `<div class="junction-opt junction-${opt.direction}">
+        <span class="junction-arrow">${arrow}</span>
+        <kbd class="junction-key">${key}</kbd>
+        <span class="junction-label">${opt.label}</span>
+      </div>`;
+    }
+    html += '</div>';
+    this.junctionEl.innerHTML = html;
+    this.junctionEl.classList.remove('hidden');
+    this._junctionVisible = true;
+  }
+
+  /** Hide the route-fork chooser. */
+  hideJunctionHUD(): void {
+    if (!this.junctionEl) return;
+    this.junctionEl.classList.add('hidden');
+    this._junctionVisible = false;
   }
 
   // ─── Private ───────────────────────────────────────────────────────────────

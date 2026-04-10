@@ -48,6 +48,17 @@ export class Player {
   get isBeingHit(): boolean      { return this.isHit; }
 
   /**
+   * Consume a Q (left turn) or E (right turn) key press for junction choice.
+   * Removes the key from the held-keys set so it doesn't also affect movement.
+   * Returns `null` when neither key is currently down.
+   */
+  consumeQE(): 'q' | 'e' | null {
+    if (this.keys.has('KeyQ')) { this.keys.delete('KeyQ'); return 'q'; }
+    if (this.keys.has('KeyE')) { this.keys.delete('KeyE'); return 'e'; }
+    return null;
+  }
+
+  /**
    * Trigger the fat-bike knockback animation.
    * Applies a backward velocity impulse + random lateral shove.
    */

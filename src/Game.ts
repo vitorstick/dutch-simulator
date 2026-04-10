@@ -55,6 +55,11 @@ function playBell(): void {
 
 type GameState = 'MENU' | 'PLAYING' | 'GAME_OVER';
 
+/** Show the junction HUD when this many path-units from the fork. */
+const JUNCTION_WARN_DIST = 40;
+/** Auto-choose the default (first) option when this close to the fork end. */
+const AUTO_CHOOSE_DIST   = 5;
+
 // ─── Game class ───────────────────────────────────────────────────────────────
 
 /**
@@ -214,6 +219,40 @@ export class Game {
     this.pathSystem.ensureAhead(playerDist);
     this.pathSystem.pruneBehind(playerDist);
     this.world.update(this.pathSystem);
+    this.world.updatePreviews(this.pathSystem.previewSegments);
+
+    // ── Junction / route-fork handling ───────────────────────────────────────
+    const pending = this.pathSystem.pendingJunction;
+    if (pending) {
+      const lastSeg      = this.pathSystem.segments[this.pathSystem.segments.length - 1];
+      const distToJunction = lastSeg.endDist - playerDist;
+
+      if (distToJunction <= JUNCTION_WARN_DIST) {
+        this.ui.showJunctionHUD(pending);
+
+        const qe = this.player.consumeQE();
+        if (qe !== null) {
+          // Player pressed Q (left) or E (right/alternative).
+          let optIdx = 0;
+          if (qe === 'q') {
+            const li = pending.findIndex(o => o.direction === 'left');
+            if (li >= 0) optIdx = li;
+          } else {
+            const ri = pending.findIndex(o => o.direction === 'right');
+            optIdx = ri >= 0 ? ri : (pending.length > 1 ? 1 : 0);
+          }
+          this.pathSystem.chooseBranch(optIdx);
+          this.ui.hideJunctionHUD();
+          this.ui.showHint(`→ ${pending[optIdx].label}`, 1200);
+        } else if (distToJunction <= AUTO_CHOOSE_DIST) {
+          // No input — default to first option (main/straight route).
+          this.pathSystem.chooseBranch(0);
+          this.ui.hideJunctionHUD();
+        }
+      }
+    } else {
+      this.ui.hideJunctionHUD();
+    }
 
     // ── Player ──────────────────────────────────────────────────────────────
     this.player.update(delta);

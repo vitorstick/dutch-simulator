@@ -2,6 +2,16 @@ export type Direction = 'N' | 'S' | 'E' | 'W';
 export type SideFill  = 'canal' | 'building' | 'open' | 'park' | 'plaza';
 export type EnvType   = 'boulevard' | 'canal_street' | 'alley' | 'bridge' | 'plaza';
 
+/**
+ * One outgoing option at a route junction.
+ * `direction` is relative to the cyclist's current heading at the junction.
+ */
+export interface JunctionOption {
+  label:             string;
+  direction:         'left' | 'straight' | 'right';
+  nextTemplateIndex: number;
+}
+
 export interface StreetSegment {
   name:          string;        // e.g. "Herengracht (east)"
   startX:        number;        // world X of segment start
@@ -199,5 +209,93 @@ export const AMSTERDAM_ROUTE: StreetSegment[] = [
     name: "Dam Square", startX: 0, startZ: 150, endX: 0, endZ: 0,
     direction: 'N', environment: 'plaza', leftSide: 'plaza', rightSide: 'plaza',
     landmark: "Royal Palace", landmarkT: 0.8
-  }
+  },
+
+  // ─── Branch 1: IJ Waterfront (templates 36–38) ────────────────────────────
+  // Splits after template 1 (Damrak ends at 0,−300).
+  // Goes straight north past the waterfront, then rejoins Singel (template 4) at (−250,−300).
+  {
+    name: "IJ Waterfront North", startX: 0, startZ: -300, endX: 0, endZ: -450,
+    direction: 'N', environment: 'boulevard', leftSide: 'building', rightSide: 'canal'
+  },
+  {
+    name: "Westerdokseiland", startX: 0, startZ: -450, endX: -250, endZ: -450,
+    direction: 'W', environment: 'canal_street', leftSide: 'canal', rightSide: 'building',
+    landmark: "Eye Filmmuseum", landmarkT: 0.6
+  },
+  {
+    name: "Haarlemmer Houttuinen", startX: -250, startZ: -450, endX: -250, endZ: -300,
+    direction: 'S', environment: 'alley', leftSide: 'building', rightSide: 'building'
+  },
+
+  // ─── Branch 2: Jordaan scenic loop (templates 39–40) ─────────────────────
+  // Splits after template 5 (Singel ends at −250,0).
+  // Continues south on Leidsegracht, cuts west, then rejoins Prinsengracht
+  // at template 11 (−700,350).
+  {
+    name: "Leidsegracht", startX: -250, startZ: 0, endX: -250, endZ: 350,
+    direction: 'S', environment: 'canal_street', leftSide: 'canal', rightSide: 'building',
+    landmark: "Jordaan District", landmarkT: 0.5
+  },
+  {
+    name: "Leidsekade shortcut", startX: -250, startZ: 350, endX: -700, endZ: 350,
+    direction: 'W', environment: 'canal_street', leftSide: 'canal', rightSide: 'building'
+  },
+
+  // ─── Branch 3: Museumplein loop (templates 41–43) ─────────────────────────
+  // Splits after template 14 (bottom of Prinsengracht at −700,950).
+  // Continues south past Leidseplein and through Museumplein, then rejoins
+  // Keizersgracht at template 17 (−400,950).
+  {
+    name: "Leidsekade South", startX: -700, startZ: 950, endX: -700, endZ: 1100,
+    direction: 'S', environment: 'canal_street', leftSide: 'canal', rightSide: 'building',
+    landmark: "Leidseplein", landmarkT: 0.3
+  },
+  {
+    name: "Museumstraat", startX: -700, startZ: 1100, endX: -400, endZ: 1100,
+    direction: 'E', environment: 'plaza', leftSide: 'plaza', rightSide: 'building',
+    landmark: "Rijksmuseum", landmarkT: 0.4
+  },
+  {
+    name: "Van Baerlestraat", startX: -400, startZ: 1100, endX: -400, endZ: 950,
+    direction: 'N', environment: 'boulevard', leftSide: 'building', rightSide: 'building',
+    landmark: "Van Gogh Museum", landmarkT: 0.6
+  },
 ];
+
+/**
+ * Route graph — keyed by the index of the just-generated template.
+ *
+ * A single-option entry is an automatic continuation (no player choice).
+ * A multi-option entry pauses generation and waits for `chooseBranch()`.
+ *
+ * Direction labels are relative to the cyclist's heading at the junction:
+ * - 'left'     → the street turns left from the current heading
+ * - 'straight' → the street continues in the same heading
+ * - 'right'    → the street turns right from the current heading
+ */
+export const ROUTE_JUNCTIONS: Record<number, JunctionOption[]> = {
+  // After 2nd Damrak segment (heading N, (0,−300)):
+  //   turn LEFT onto Prins Hendrikkade (W) — or go STRAIGHT on IJ Waterfront (N)
+  1: [
+    { label: 'Prins Hendrikkade', direction: 'left',     nextTemplateIndex: 2  },
+    { label: 'IJ Waterfront',     direction: 'straight', nextTemplateIndex: 36 },
+  ],
+  // After 2nd Singel segment (heading S, (−250,0)):
+  //   turn RIGHT onto Raadhuisstraat (W) — or go STRAIGHT into Jordaan (S)
+  5: [
+    { label: 'Raadhuisstraat',    direction: 'right',    nextTemplateIndex: 6  },
+    { label: 'Jordaan (scenic)',  direction: 'straight', nextTemplateIndex: 39 },
+  ],
+  // After 6th Prinsengracht segment (heading S, (−700,950)):
+  //   turn LEFT onto Leidsestraat (E) — or go STRAIGHT via Museumplein (S)
+  14: [
+    { label: 'Leidsestraat',      direction: 'left',     nextTemplateIndex: 15 },
+    { label: 'Museumplein',       direction: 'straight', nextTemplateIndex: 41 },
+  ],
+  // Auto-continuations (single option — no player input needed):
+  35: [{ label: 'Damrak',         direction: 'straight', nextTemplateIndex: 0  }], // loop
+  38: [{ label: 'Singel',         direction: 'straight', nextTemplateIndex: 4  }], // IJ branch rejoins
+  40: [{ label: 'Prinsengracht',  direction: 'straight', nextTemplateIndex: 11 }], // Jordaan rejoins
+  43: [{ label: 'Keizersgracht',  direction: 'straight', nextTemplateIndex: 17 }], // Museumplein rejoins
+};

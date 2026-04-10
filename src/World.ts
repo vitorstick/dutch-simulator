@@ -6,8 +6,9 @@ const MARGIN = 10;
 
 export class World {
   private readonly scene: THREE.Scene;
-  private readonly segGroups:    Map<number, THREE.Group> = new Map();
-  private readonly cornerGroups: Map<number, THREE.Group> = new Map();
+  private readonly segGroups:     Map<number, THREE.Group> = new Map();
+  private readonly cornerGroups:  Map<number, THREE.Group> = new Map();
+  private readonly previewGroups: Map<number, THREE.Group> = new Map();
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -18,10 +19,12 @@ export class World {
    * Call before `update()` when resetting to the start of the path.
    */
   reset(): void {
-    for (const g of this.segGroups.values())    this.scene.remove(g);
-    for (const g of this.cornerGroups.values()) this.scene.remove(g);
+    for (const g of this.segGroups.values())     this.scene.remove(g);
+    for (const g of this.cornerGroups.values())  this.scene.remove(g);
+    for (const g of this.previewGroups.values()) this.scene.remove(g);
     this.segGroups.clear();
     this.cornerGroups.clear();
+    this.previewGroups.clear();
   }
 
   update(pathSystem: PathSystem): void {
@@ -56,6 +59,67 @@ export class World {
         this.cornerGroups.delete(idx);
       }
     }
+  }
+
+  /**
+   * Render short "ghost" road previews for each pending junction option so
+   * the player can see the fork in 3D before making their choice.
+   * Pass an empty array to clear all previews when the junction is resolved.
+   */
+  updatePreviews(previewSegs: Segment[]): void {
+    const keep = new Set(previewSegs.map(s => s.index));
+    for (const [idx, g] of this.previewGroups) {
+      if (!keep.has(idx)) {
+        this.scene.remove(g);
+        this.previewGroups.delete(idx);
+      }
+    }
+    for (const seg of previewSegs) {
+      if (!this.previewGroups.has(seg.index)) {
+        const g = this._buildPreviewSegment(seg);
+        this.scene.add(g);
+        this.previewGroups.set(seg.index, g);
+      }
+    }
+  }
+
+  private _buildPreviewSegment(seg: Segment): THREE.Group {
+    const group = new THREE.Group();
+    group.position.set(seg.startX, 0, seg.startZ);
+    group.rotation.y = -Math.atan2(seg.dirX, -seg.dirZ);
+
+    const L    = seg.length;
+    const midZ = -(L / 2);
+
+    // Base ground
+    const addPlane = (w: number, h: number, color: number, x: number, y: number, z: number): void => {
+      const geo  = new THREE.PlaneGeometry(w, h);
+      const mat  = new THREE.MeshLambertMaterial({ color });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.set(x, y, z);
+      group.add(mesh);
+    };
+
+    addPlane(22, L, 0x4a6741,  0, -0.02, midZ);  // grass base
+    addPlane( 8, L, 0x1e1e1e,  7, 0,     midZ);  // road — slightly lighter than normal to signal "option"
+    addPlane( 3, L, 0xb89c7a, -3.5, 0.005, midZ); // footpath
+    addPlane( 3, L, 0xb89c7a,  3.5, 0.005, midZ);
+
+    // Bike lane — orange tint to distinguish from active route
+    addPlane(CYCLE_PATH_HALF_WIDTH * 2, L, 0xdd4400, 0, 0.01, midZ);
+
+    // Dashed direction arrows every 10 units — show which way the branch goes
+    for (let d = 5; d < L; d += 10) {
+      addPlane(1.2, 4, 0xff9900, 0, 0.02, -d);
+    }
+
+    // Route name label at the entry of the fork
+    if (seg.name) {
+      this._addStreetLabel(group, seg.name, -4);
+    }
+
+    return group;
   }
 
   private _buildSegment(seg: Segment): THREE.Group {

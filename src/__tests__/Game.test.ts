@@ -19,9 +19,15 @@ describe('Game._update logic (unit tests with mocks)', () => {
     game = Object.create(Game.prototype)
     game.setup = { renderer: { render: vi.fn(), setSize: vi.fn() }, scene: {} }
     game.camera = { shake: vi.fn(), update: vi.fn(), toggleMode: vi.fn() }
-    game.pathSystem = { ensureAhead: vi.fn(), pruneBehind: vi.fn(), dirAt: vi.fn().mockReturnValue({ dirX: 0, dirZ: -1 }) }
-    game.world = { update: vi.fn(), reset: vi.fn() }
-    game.player = { pathDistance: 10, update: vi.fn(), position: { x: 0, y: 0, z: 0 }, hitByFatBike: vi.fn() }
+    game.pathSystem = {
+      ensureAhead: vi.fn(),
+      pruneBehind: vi.fn(),
+      dirAt: vi.fn().mockReturnValue({ dirX: 0, dirZ: -1 }),
+      pendingJunction: null,
+      segments: [{ startDist: 0, endDist: 9999 }],
+    }
+    game.world = { update: vi.fn(), updatePreviews: vi.fn(), reset: vi.fn() }
+    game.player = { pathDistance: 10, update: vi.fn(), position: { x: 0, y: 0, z: 0 }, hitByFatBike: vi.fn(), consumeQE: vi.fn().mockReturnValue(null) }
 
     mockNpcManager = {
       update: vi.fn(),
@@ -45,7 +51,7 @@ describe('Game._update logic (unit tests with mocks)', () => {
     }
     game.score = mockScore
 
-    game.ui = { update: vi.fn() }
+    game.ui = { update: vi.fn(), showJunctionHUD: vi.fn(), hideJunctionHUD: vi.fn(), showHint: vi.fn() }
     game.state = 'PLAYING'
     game.levelIndex = 0
     game.timeLeft = 5
@@ -102,7 +108,7 @@ describe('Game._update logic (unit tests with mocks)', () => {
     ;(checkCollisions as any).mockReturnValue([])
     ;(checkFatBikeCollisions as any).mockReturnValue([])
     mockNpcManager.allCleared = vi.fn().mockReturnValue(true)
-    game.ui = { update: vi.fn(), showLevelBanner: vi.fn(), showVictory: vi.fn() }
+    game.ui = { update: vi.fn(), showLevelBanner: vi.fn(), showVictory: vi.fn(), showJunctionHUD: vi.fn(), hideJunctionHUD: vi.fn(), showHint: vi.fn() }
     game._startLevel = vi.fn()
 
     ;(Game.prototype as any)._update.call(game, 0.016, 42)
@@ -117,7 +123,7 @@ describe('Game._update logic (unit tests with mocks)', () => {
     ;(checkCollisions as any).mockReturnValue([])
     ;(checkFatBikeCollisions as any).mockReturnValue([])
     mockNpcManager.allCleared = vi.fn().mockReturnValue(true)
-    game.ui = { update: vi.fn(), showLevelBanner: vi.fn(), showVictory: vi.fn() }
+    game.ui = { update: vi.fn(), showLevelBanner: vi.fn(), showVictory: vi.fn(), showJunctionHUD: vi.fn(), hideJunctionHUD: vi.fn(), showHint: vi.fn() }
     game._startLevel = vi.fn()
     game.levelIndex = 4
 
