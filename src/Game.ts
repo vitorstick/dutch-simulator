@@ -92,7 +92,6 @@ export class Game {
   private levelIndex  = 0;
   private timeLeft    = 0;
   private lastTime    = 0;
-  private playerName  = 'ANON';
 
   /**
    * Initialise all subsystems, register global event listeners, start the
@@ -125,18 +124,26 @@ export class Game {
   // ─── Menu ───────────────────────────────────────────────────────────
 
   /**
-   * Show the main menu with the current leaderboard.
-   * The player enters their name and clicks START to begin.
+   * Show the main menu with the current leaderboard and bike selection.
    */
   private _showMenu(): void {
     this.state = 'MENU';
-    this.ui.showMenu([], (name) => {
-      this.playerName = name;
-      this._hardReset();
-      this._startLevel(0);
-    });
-    // Fetch global scores in the background; refresh table when ready
-    void loadLeaderboard().then(entries => this.ui.refreshLeaderboard(entries));
+    
+    // Position player for the menu preview
+    this._hardReset();
+    
+    this.ui.showMenu(
+      (bikeType) => {
+        this.player.setBikeType(bikeType);
+        // Snap the mesh rotation back to the path direction before starting
+        const dir = this.pathSystem.dirAt(this.player.pathDistance);
+        this.player.mesh.rotation.y = Math.atan2(-dir.dirX, -dir.dirZ);
+        this._startLevel(0);
+      },
+      (bikeType) => {
+        this.player.setBikeType(bikeType);
+      }
+    );
   }
 
   // ─── Level management ────────────────────────────────────────────────────
@@ -187,7 +194,16 @@ export class Game {
     const delta = Math.min((now - this.lastTime) / 1000, 0.05);
     this.lastTime = now;
 
-    this._update(delta, now / 1000);
+    if (this.state === 'MENU') {
+      // Slowly rotate the active character preview in the menu
+      this.player.mesh.rotation.y += delta * 0.8;
+      // Ensure the camera tracks the player position cleanly during menu
+      const dir = this.pathSystem.dirAt(this.player.pathDistance);
+      this.camera.update(delta, this.player.position, dir);
+    } else {
+      this._update(delta, now / 1000);
+    }
+    
     this.setup.renderer.render(this.setup.scene, this.camera.camera);
   }
 
@@ -316,17 +332,16 @@ export class Game {
     this._startLevel(repeatIndex);
   }
 
-  /**
-   * Called when the player has run out of lives.
-   * Transitions to `GAME_OVER` and shows the game over overlay.
-   */
   private _onGameOver(): void {
     this.state = 'GAME_OVER';
-    void saveScore(this.playerName, this.score.score);
-    this.ui.showGameOver(this.score.score, this.levelIndex + 1, () => {
+    
+    // Initially show with an empty list, then load async
+    this.ui.showGameOver(this.score.score, this.levelIndex + 1, [], (name) => {
+      void saveScore(name, this.score.score);
       this.score.fullReset();
       this._showMenu();
     });
+    void loadLeaderboard().then(entries => this.ui.refreshLeaderboard(entries));
   }
 
   // ─── Resize ──────────────────────────────────────────────────────────────

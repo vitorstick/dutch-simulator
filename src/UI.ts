@@ -195,49 +195,49 @@ export class UI {
   }
 
   /**
-   * Show the main menu overlay with the top-scores leaderboard and a name
-   * entry field. The `onStart` callback receives the player's chosen name.
+   * Show the main menu overlay with the top-scores leaderboard and bike selection.
    *
-   * @param entries  - Current leaderboard (top 10).
-   * @param onStart  - Callback invoked with the entered name when START is clicked.
+   * @param entries   - Current leaderboard (top 10).
+   * @param onStart   - Callback invoked with the chosen bike when START is clicked.
+   * @param onChange  - Callback invoked when player cycles through bikes so Game rotates it.
    */
-  showMenu(entries: LeaderboardEntry[], onStart: (name: string) => void): void {
+  showMenu(
+    onStart: (bikeType: 'regular' | 'bakfiets') => void,
+    onChange?: (bikeType: 'regular' | 'bakfiets') => void
+  ): void {
+    // We add a specific class to overlay to change its layout during menu
+    this.overlayEl.classList.add('menu-mode');
+    
     this.titleEl.textContent = '🚲 DUTCH SIMULATOR';
 
     this.bodyEl.innerHTML = `
-      <p class="menu-tagline">Ride your bike and clear the cycle path!<br>Use <b>WASD</b> or <b>Arrow Keys</b> to move.</p>
-      <div class="leaderboard">
-        <h3>🏆 TOP SCORES</h3>
-        <table id="lb-table">${this._buildRows(entries, true)}</table>
+      <div class="bike-select">
+        <button id="btn-prev-bike">◄</button>
+        <span id="bike-label">REGULAR BICYCLE</span>
+        <button id="btn-next-bike">►</button>
       </div>
-      <div class="name-entry">
-        <label for="player-name">YOUR NAME</label>
-        <input id="player-name" type="text" maxlength="20" placeholder="Your name…" autocomplete="off" spellcheck="false" required>
-      </div>
+      <p class="menu-tagline">Use <b>WASD</b> or <b>Arrow Keys</b> to move.<br>Avoid fat bikes, hit pedestrians!</p>
     `;
+
+    let currentBike: 'regular' | 'bakfiets' = 'regular';
+    const bikeLabel = document.getElementById('bike-label')!;
+    
+    const cycleBike = () => {
+      currentBike = currentBike === 'regular' ? 'bakfiets' : 'regular';
+      bikeLabel.textContent = currentBike === 'regular' ? 'REGULAR BICYCLE' : 'BAKFIETS';
+      if (onChange) onChange(currentBike);
+    };
+
+    document.getElementById('btn-prev-bike')!.onclick = cycleBike;
+    document.getElementById('btn-next-bike')!.onclick = cycleBike;
 
     this.btnEl.textContent = 'START RIDING';
     this.btnEl.onclick = () => {
-      const input = document.getElementById('player-name') as HTMLInputElement | null;
-      const name  = input?.value.trim().slice(0, 20) ?? '';
-      if (!name) {
-        input?.classList.add('input-error');
-        input?.focus();
-        return;
-      }
       this.overlayEl.classList.add('hidden');
-      onStart(name);
+      this.overlayEl.classList.remove('menu-mode'); // remove menu-specific layout
+      onStart(currentBike);
     };
     this.overlayEl.classList.remove('hidden');
-
-    const nameInput = document.getElementById('player-name') as HTMLInputElement | null;
-    if (nameInput) {
-      nameInput.addEventListener('input', () => nameInput.classList.remove('input-error'));
-      nameInput.addEventListener('keydown', (e: KeyboardEvent) => {
-        if (e.key === 'Enter') this.btnEl.click();
-      });
-      setTimeout(() => nameInput.focus(), 60);
-    }
   }
 
   /**
@@ -278,30 +278,34 @@ export class UI {
 
   /**
    * Show the all-levels-cleared victory overlay.
-   * @param score      - Final score to display.
-   * @param onRestart  - Callback invoked when the player clicks "RIDE AGAIN".
+   * @param score         - Final score to display.
+   * @param entries       - Current leaderboard.
+   * @param onSubmitScore - Callback invoked to save score and return to menu.
    */
-  showVictory(score: number, onRestart: () => void): void {
-    this._show(
+  showVictory(score: number, entries: LeaderboardEntry[], onSubmitScore: (name: string) => void): void {
+    this._showScoreEntry(
       '🏆 AMSTERDAM IS YOURS!',
       `You cleared all levels!<br>Final score: <b>${score}</b>`,
-      'RIDE AGAIN',
-      onRestart,
+      'SUBMIT SCORE',
+      entries,
+      onSubmitScore,
     );
   }
 
   /**
    * Show the game over overlay.
-   * @param score      - Final score to display.
-   * @param level      - Level the player reached (1-based).
-   * @param onRestart  - Callback invoked when the player clicks "RIDE AGAIN".
+   * @param score         - Final score to display.
+   * @param level         - Level the player reached (1-based).
+   * @param entries       - Current leaderboard.
+   * @param onSubmitScore - Callback invoked to save score and return to menu.
    */
-  showGameOver(score: number, level: number, onRestart: () => void): void {
-    this._show(
+  showGameOver(score: number, level: number, entries: LeaderboardEntry[], onSubmitScore: (name: string) => void): void {
+    this._showScoreEntry(
       '💥 GAME OVER',
       `Reached Level ${level}<br>Final score: <b>${score}</b>`,
-      'RIDE AGAIN',
-      onRestart,
+      'SUBMIT SCORE',
+      entries,
+      onSubmitScore,
     );
   }
 
@@ -422,28 +426,48 @@ export class UI {
     ).join('');
   }
 
-  /**
-   * Populate and reveal the shared overlay panel.
-   *
-   * @param title    - Large heading text.
-   * @param body     - HTML string for the description paragraph.
-   * @param btnLabel - Label for the call-to-action button.
-   * @param onPress  - Callback fired when the button is clicked; the overlay
-   *                   is automatically hidden before the callback runs.
-   */
-  private _show(
+  private _showScoreEntry(
     title: string,
     body:  string,
     btnLabel: string,
-    onPress: () => void,
+    entries: LeaderboardEntry[],
+    onPress: (name: string) => void,
   ): void {
     this.titleEl.textContent = title;
-    this.bodyEl.innerHTML    = body;
+    this.bodyEl.innerHTML    = body + `
+      <div class="leaderboard">
+        <h3>🏆 TOP SCORES</h3>
+        <table id="lb-table">${this._buildRows(entries, true)}</table>
+      </div>
+      <div class="name-entry">
+        <label for="player-name">YOUR NAME</label>
+        <input id="player-name" type="text" maxlength="20" placeholder="Your name…" autocomplete="off" spellcheck="false" required>
+      </div>
+    `;
     this.btnEl.textContent   = btnLabel;
-    this.btnEl.onclick       = () => {
+    
+    const handlePress = () => {
+      const input = document.getElementById('player-name') as HTMLInputElement | null;
+      const name  = input?.value.trim().slice(0, 20) ?? '';
+      if (!name) {
+        input?.classList.add('input-error');
+        input?.focus();
+        return;
+      }
       this.overlayEl.classList.add('hidden');
-      onPress();
+      onPress(name);
     };
+
+    this.btnEl.onclick = handlePress;
     this.overlayEl.classList.remove('hidden');
+
+    const nameInput = document.getElementById('player-name') as HTMLInputElement | null;
+    if (nameInput) {
+      nameInput.addEventListener('input', () => nameInput.classList.remove('input-error'));
+      nameInput.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Enter') handlePress();
+      });
+      setTimeout(() => nameInput.focus(), 60);
+    }
   }
 }
